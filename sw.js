@@ -1,5 +1,13 @@
 const CACHE_NAME = 'mobileCRM-v29';
-const CACHE_FILES = ['/', '/manifest.json', '/icon-192.png', '/icon-512.png'];
+
+// スコープ（サブディレクトリ対応）
+const BASE = self.registration.scope;
+const CACHE_FILES = [
+  BASE,
+  BASE + 'manifest.json',
+  BASE + 'icon-192.png',
+  BASE + 'icon-512.png'
+];
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -19,6 +27,6 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).catch(() => cached))
+    caches.match(e.request).then(cached => cached || fetch(e.request))
   );
 });
