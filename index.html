@@ -1,0 +1,3087 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="manifest" href="/manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MobileCRM">
+<meta name="theme-color" content="#0b0f1a">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>MobileCRM</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --surface: #141926;
+    --surface2: #1c2335;
+    --border: #252e42;
+    --accent: #3dd9a4;
+    --accent-dim: #1a4035;
+    --call-red: #e84545;
+    --call-red-dim: #3a1111;
+    --amber: #f5a623;
+    --amber-dim: #3a2800;
+    --text: #e8eaf0;
+    --text2: #8892aa;
+    --text3: #4a5568;
+    --danger: #e84545;
+    --mono: 'Courier New', 'Osaka-Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { background: var(--bg); color: var(--text); font-family: 'Hiragino Sans', 'Yu Gothic UI', 'Meiryo', sans-serif; min-height: 100vh; overscroll-behavior: none; transition: background-color 0.6s ease; }
+  
+  /* Layout */
+  .app { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; }
+  .header { padding: 18px 18px 0; display: flex; justify-content: space-between; align-items: flex-start; }
+  .header-title { font-size: 10px; font-weight: 700; letter-spacing: .18em; color: var(--accent); text-transform: uppercase; margin-bottom: 3px; }
+  .header-sub { font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+  .header-stat { text-align: right; }
+  .header-stat-label { font-size: 10px; color: var(--text2); margin-bottom: 1px; }
+  .header-stat-val { font-size: 22px; font-weight: 700; color: var(--accent); font-family: var(--mono); }
+  .content { padding: 14px 14px 90px; }
+  
+  /* Bottom nav */
+  .nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: var(--bg); border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 8px 0 max(12px, env(safe-area-inset-bottom)); z-index: 100; }
+  .nav-btn { background: none; border: none; color: var(--text2); font-size: 11px; font-family: inherit; cursor: pointer; padding: 6px 14px; display: flex; flex-direction: column; align-items: center; gap: 3px; transition: color .15s; }
+  .nav-btn.active { color: var(--accent); }
+  .nav-icon { font-size: 22px; }
+  .nav-badge { position: absolute; top: 2px; right: 10px; background: var(--amber); color: #000; font-size: 9px; font-weight: 700; border-radius: 8px; padding: 1px 5px; }
+  .nav-btn { position: relative; }
+  
+  /* Cards */
+  .card { background: var(--surface); border-radius: 14px; padding: 16px; border: 1px solid var(--border); margin-bottom: 12px; }
+  
+  /* Buttons */
+  .btn-primary { background: var(--accent); border: none; color: var(--bg); border-radius: 10px; padding: 12px; font-weight: 700; font-size: 15px; cursor: pointer; font-family: inherit; width: 100%; transition: opacity .15s; }
+  .btn-primary:active { opacity: .8; }
+  .btn-ghost { background: none; border: 1px solid var(--border); color: var(--text2); border-radius: 10px; padding: 10px; font-size: 13px; cursor: pointer; font-family: inherit; width: 100%; transition: border-color .15s; }
+  .btn-ghost:active { border-color: var(--text2); }
+  .btn-danger { background: none; border: 1px solid var(--danger); color: var(--danger); border-radius: 8px; padding: 7px 14px; font-size: 12px; cursor: pointer; font-family: inherit; }
+  
+  /* Input */
+  input[type=text], input[type=tel], textarea { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 9px; padding: 11px 13px; font-size: 15px; width: 100%; outline: none; font-family: inherit; appearance: none; -webkit-appearance: none; transition: border-color .15s; }
+  input:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 100px; }
+  
+  /* Call button */
+  .call-btn { display: block; text-align: center; text-decoration: none; background: linear-gradient(135deg, #c0392b, #e84545); border: none; color: #fff; font-size: 21px; font-weight: 700; border-radius: 16px; padding: 22px; width: 100%; cursor: pointer; letter-spacing: .05em; transition: transform .1s; box-shadow: 0 6px 24px rgba(232,69,69,.35); font-family: inherit; }
+  .call-btn:active { transform: scale(.96); }
+  @keyframes pulse { 0%,100%{box-shadow:0 6px 24px rgba(232,69,69,.35)} 50%{box-shadow:0 6px 32px rgba(232,69,69,.6)} }
+  .call-btn[href] { animation: pulse 2s infinite; }
+  
+  /* Result buttons */
+  .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+  .result-btn { border: 1.5px solid; background: transparent; border-radius: 11px; padding: 13px 10px; font-size: 14px; cursor: pointer; font-family: inherit; color: inherit; transition: background .15s; display: flex; align-items: center; justify-content: center; gap: 7px; }
+  .result-btn:active { opacity: .7; }
+  
+  /* Progress dots */
+  .dots { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 14px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--surface2); transition: background .3s; }
+  .dot.done { background: var(--text3); }
+  .dot.current { background: var(--accent); }
+  
+  /* Contact list */
+  .contact-item { background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .contact-num { width: 28px; height: 28px; border-radius: 50%; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; font-family: var(--mono); color: var(--text2); flex-shrink: 0; }
+  .contact-num.current { background: var(--accent); color: var(--bg); }
+  .contact-info { flex: 1; min-width: 0; }
+  .contact-name { font-size: 15px; font-weight: 600; }
+  .contact-phone { font-family: var(--mono); font-size: 13px; color: var(--text2); }
+  .icon-btn { background: none; border: none; cursor: pointer; padding: 5px; font-size: 16px; opacity: .7; }
+  .icon-btn:active { opacity: 1; }
+  
+  /* Badges */
+  .badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; letter-spacing: .04em; }
+  
+  /* Log items */
+  .log-item { background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: 12px 14px; margin-bottom: 8px; }
+  .log-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .log-name { font-size: 14px; font-weight: 600; }
+  .log-phone { font-family: var(--mono); font-size: 12px; color: var(--text2); }
+  .log-date { font-family: var(--mono); font-size: 11px; color: var(--text3); margin-top: 5px; }
+  
+  /* Stat cards */
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 9px; margin-bottom: 12px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; text-align: center; padding: 12px 8px; }
+  .stat-val { font-family: var(--mono); font-size: 26px; font-weight: 700; }
+  .stat-label { font-size: 10px; color: var(--text2); margin-top: 2px; }
+  
+  /* Pending panel */
+  .pending-panel { background: var(--surface); border: 1.5px solid var(--amber); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+  .pending-title { font-size: 11px; color: var(--amber); font-weight: 700; letter-spacing: .12em; margin-bottom: 10px; }
+  
+  /* Modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 200; display: flex; align-items: flex-end; justify-content: center; }
+  .modal { background: var(--surface); border-radius: 20px 20px 0 0; padding: 20px; width: 100%; max-width: 480px; max-height: 85vh; overflow-y: auto; }
+  .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
+  .modal-close { background: none; border: none; color: var(--text2); font-size: 24px; cursor: pointer; float: right; padding: 0 4px; line-height: 1; }
+  
+  /* Import */
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+  .info-cell label { display: block; font-size: 10px; color: var(--text2); font-weight: 700; letter-spacing: .08em; margin-bottom: 3px; text-transform: uppercase; }
+  .info-cell input { padding: 7px 9px; font-size: 13px; }
+  .info-divider { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+  .two-btn-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 8px; }
+  .back-btn { background: none; border: 1px solid var(--border); color: var(--text2); border-radius: 10px; padding: 10px 14px; font-size: 13px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .back-btn:disabled { opacity: .3; cursor: not-allowed; }
+  .import-area:hover, .import-area.drag { border-color: var(--accent); }
+  .import-icon { font-size: 36px; margin-bottom: 8px; }
+  .import-hint { font-size: 13px; color: var(--text2); margin-top: 6px; }
+  .preview-item { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .preview-phone { font-family: var(--mono); color: var(--text2); }
+  
+  .section-label { font-size: 11px; color: var(--text2); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 10px; }
+  .past-call-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--text2); padding: 3px 0; }
+  
+  .tab { display: none; }
+  .tab.active { display: block; }
+  
+  input[type=file] { display: none; }
+  
+  .edit-form { display: flex; flex-direction: column; gap: 8px; background: var(--surface2); border-radius: 11px; padding: 12px; margin-bottom: 8px; border: 1px solid var(--accent); }
+  .edit-btns { display: flex; gap: 8px; }
+  .edit-btns button { flex: 1; }
+  
+  .import-tab-btns { display: flex; gap: 0; margin-bottom: 14px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .import-tab-btn { flex: 1; background: none; border: none; color: var(--text2); font-family: inherit; font-size: 13px; padding: 10px; cursor: pointer; transition: background .15s, color .15s; }
+  .import-tab-btn.active { background: var(--accent); color: var(--bg); font-weight: 700; }
+  
+  .radio-group { display: flex; gap: 0; margin-bottom: 14px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .radio-btn { flex: 1; background: none; border: none; color: var(--text2); font-family: inherit; font-size: 13px; padding: 10px; cursor: pointer; transition: background .15s, color .15s; }
+  .radio-btn.active { background: var(--surface2); color: var(--text); font-weight: 600; }
+  
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* Auth */
+  .auth-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .auth-box { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 32px 24px; width: 100%; max-width: 360px; }
+  .auth-logo { font-size: 40px; text-align: center; margin-bottom: 8px; }
+  .auth-title { font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 4px; }
+  .auth-sub { font-size: 13px; color: var(--text2); text-align: center; margin-bottom: 24px; }
+  .auth-error { font-size: 13px; color: var(--danger); text-align: center; margin-top: 10px; min-height: 18px; }
+  .auth-hint { font-size: 11px; color: var(--text3); text-align: center; margin-top: 16px; }
+</style>
+</head>
+<body>
+<!-- Auth Overlay -->
+<div id="auth-overlay" class="auth-overlay">
+  <!-- Login -->
+  <div id="auth-login" class="auth-box">
+    <div class="auth-logo">📞</div>
+    <div class="auth-title">MobileCRM</div>
+    <div class="auth-sub">パスワードを入力してください</div>
+    <input type="password" id="auth-pw" placeholder="パスワード" style="margin-bottom:12px"
+      onkeydown="if(event.key==='Enter')attemptLogin()">
+    <button class="btn-primary" onclick="attemptLogin()">開く</button>
+    <div class="auth-error" id="auth-error"></div>
+    <div class="auth-hint">アクセスが許可されたユーザーのみ利用できます</div>
+    <div style="text-align:center;margin-top:20px">
+      <button onclick="resetPassword()" style="background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;text-decoration:underline;font-family:inherit">パスワードを忘れた・開けない場合</button>
+    </div>
+  </div>
+  <!-- First-time setup -->
+  <div id="auth-setup" class="auth-box" style="display:none">
+    <div class="auth-logo">🔐</div>
+    <div class="auth-title">初回設定</div>
+    <div class="auth-sub">このデバイス用のパスワードを設定してください</div>
+    <input type="password" id="setup-pw1" placeholder="パスワード" style="margin-bottom:16px"
+      onkeydown="if(event.key==='Enter')savePasswords()">
+    <button class="btn-primary" onclick="savePasswords()">設定して開始</button>
+    <div class="auth-error" id="setup-error"></div>
+    <div class="auth-hint">もう一方の端末でも同様に設定してください</div>
+  </div>
+</div>
+
+<!-- Excel Import Modal -->
+<div class="modal-overlay" id="excel-modal" style="display:none" onclick="closeExcelModal(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-height:85vh">
+    <div class="modal-title">
+      <button class="modal-close" onclick="closeExcelModal()">×</button>
+      📊 Excel顧客取込
+    </div>
+    <div id="excel-file-info" style="font-size:12px;color:var(--text2);margin-bottom:12px"></div>
+
+    <!-- 取込モード -->
+    <div class="section-label" style="margin-bottom:6px">取込方法</div>
+    <div class="radio-group" style="margin-bottom:14px">
+      <button class="radio-btn active" id="xmode-merge"   onclick="setExcelMode('merge')">上書き更新</button>
+      <button class="radio-btn"        id="xmode-append"  onclick="setExcelMode('append')">追記</button>
+      <button class="radio-btn"        id="xmode-replace" onclick="setExcelMode('replace')">全置換</button>
+    </div>
+    <div id="excel-mode-desc" style="font-size:11px;color:var(--text2);margin-bottom:14px">名前 or 電話番号が一致する場合は上書き。一致しない場合は追加します</div>
+
+    <!-- プレビュー -->
+    <div class="section-label" style="margin-bottom:6px">プレビュー（<span id="excel-count"></span>件）</div>
+    <div id="excel-preview-list" style="max-height:220px;overflow-y:auto;margin-bottom:14px;font-size:13px"></div>
+
+    <button class="btn-primary" onclick="executeExcelImport()">取込実行</button>
+  </div>
+</div>
+
+<!-- 過去注文入力モーダル -->
+<div class="modal-overlay" id="order-modal" style="display:none" onclick="closeOrderModal(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-height:85vh">
+    <div class="modal-title">
+      <button class="modal-close" onclick="closeOrderModal()">×</button>
+      🛒 過去注文入力
+    </div>
+    <div id="order-modal-name" style="font-size:16px;font-weight:700;margin-bottom:2px"></div>
+    <div id="order-modal-phone" style="font-family:var(--mono);font-size:13px;color:var(--text2);margin-bottom:14px"></div>
+
+    <!-- 既存注文 -->
+    <div id="order-existing-section" style="display:none;margin-bottom:14px">
+      <div class="section-label" style="margin-bottom:6px">登録済み注文日</div>
+      <div id="order-existing-list" style="font-size:13px;color:var(--text2)"></div>
+    </div>
+
+    <!-- 新規入力 -->
+    <div class="section-label" style="margin-bottom:8px">注文日を追加</div>
+    <div id="order-date-rows" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
+    <button onclick="addOrderDateRow()" class="btn-ghost" style="width:100%;padding:10px;font-size:13px">
+      ＋ 日付と金額を追加
+    </button>
+    <div style="margin-top:14px">
+      <button class="btn-primary" onclick="saveOrderDates()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- 今日のコールリスト（起動時ダッシュボード）-->
+<div class="modal-overlay" id="today-modal" style="display:none" onclick="closeTodayModal(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-height:92vh;padding-bottom:20px">
+    <div class="modal-title" style="font-size:16px">
+      <button class="modal-close" onclick="closeTodayModal()">×</button>
+      📋 今日のコールリスト
+    </div>
+    <div id="today-summary" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap"></div>
+    <div id="today-list" style="overflow-y:auto;max-height:65vh"></div>
+    <button class="btn-primary" onclick="closeTodayModal()" style="margin-top:12px">コール開始</button>
+  </div>
+</div>
+
+<!-- 月次レポートモーダル -->
+<div class="modal-overlay" id="monthly-modal" style="display:none" onclick="closeMonthlyModal(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-height:90vh">
+    <div class="modal-title">
+      <button class="modal-close" onclick="closeMonthlyModal()">×</button>
+      📊 月次レポート
+    </div>
+    <div id="monthly-report-body" style="font-size:13px"></div>
+  </div>
+</div>
+
+<!-- 注文取込モーダル -->
+<div class="modal-overlay" id="order-import-modal" style="display:none" onclick="closeOrderImportModal(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-height:88vh">
+    <div class="modal-title">
+      <button class="modal-close" onclick="closeOrderImportModal()">×</button>
+      📦 注文データ取込
+    </div>
+    <div id="order-import-info" style="font-size:12px;color:var(--text2);margin-bottom:10px"></div>
+    <div id="order-import-preview" style="max-height:50vh;overflow-y:auto;font-size:12px;margin-bottom:14px"></div>
+    <button class="btn-primary" onclick="executeOrderImport()">取込実行</button>
+  </div>
+</div>
+
+<!-- Drive Settings Modal -->
+<div class="modal-overlay" id="drive-modal" style="display:none" onclick="closeDriveModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">
+      <button class="modal-close" onclick="closeDriveModal()">×</button>
+      ☁️ Google Drive 設定
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:6px">GASデプロイURL</div>
+    <input type="text" id="drive-url-input" placeholder="https://script.google.com/macros/s/..." style="margin-bottom:12px;font-size:12px">
+    <div style="font-size:12px;color:var(--text2);margin-bottom:6px">秘密キー</div>
+    <input type="password" id="drive-key-input" placeholder="スクリプトプロパティに設定したKEY" style="margin-bottom:16px">
+    <button class="btn-primary" onclick="saveDriveSettings()">保存して接続確認</button>
+    <div id="drive-settings-msg" style="font-size:12px;text-align:center;margin-top:10px;min-height:18px"></div>
+    <div style="margin-top:16px;padding:12px;background:var(--surface2);border-radius:8px;font-size:11px;color:var(--text2);line-height:1.7">
+      <b>設定手順</b><br>
+      1. script.google.com で新規プロジェクト作成<br>
+      2. autocall_gas.gs のコードを貼り付けて保存<br>
+      3. プロジェクトの設定 → スクリプトプロパティ<br>
+      　　KEY = 任意の秘密キー を追加<br>
+      4. デプロイ → 新しいデプロイ<br>
+      　　実行: 自分 / アクセス: 全員<br>
+      5. デプロイURLをここに貼り付け
+    </div>
+  </div>
+</div>
+
+<!-- Password Change Modal -->
+<div class="modal-overlay" id="pw-modal" style="display:none" onclick="closePwModal(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:480px">
+    <div class="modal-title">
+      <button class="modal-close" onclick="closePwModal()">×</button>
+      🔐 パスワード変更
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:6px">現在のパスワード</div>
+    <input type="password" id="pw-current" placeholder="現在のパスワード" style="margin-bottom:14px">
+    <div style="font-size:12px;color:var(--text2);margin-bottom:6px">新しいパスワード</div>
+    <input type="password" id="pw-new1" placeholder="新しいパスワード" style="margin-bottom:16px">
+    <button class="btn-primary" onclick="changePasswords()">変更する</button>
+    <div class="auth-error" id="pw-error"></div>
+  </div>
+</div>
+
+<div class="app">
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:.18em;color:var(--accent);text-transform:uppercase;margin-bottom:3px">Mobile CRM</div>
+      <div style="font-size:20px;font-weight:700;letter-spacing:-.02em">MobileCRM</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="display:flex;gap:10px;align-items:center">
+        <div style="text-align:center">
+          <div style="font-size:9px;color:var(--accent);font-weight:700;letter-spacing:.06em">通話済</div>
+          <div class="header-stat-val" id="hdr-answered">0</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:9px;color:#a78bfa;font-weight:700;letter-spacing:.06em">注文</div>
+          <div style="font-size:20px;font-weight:700;font-family:'Courier New',monospace;color:#a78bfa" id="hdr-ordered">0</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:9px;color:var(--amber);font-weight:700;letter-spacing:.06em">留守電</div>
+          <div style="font-size:20px;font-weight:700;font-family:'Courier New',monospace;color:var(--amber)" id="hdr-voicemail">0</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:9px;color:var(--danger);font-weight:700;letter-spacing:.06em">不在</div>
+          <div style="font-size:20px;font-weight:700;font-family:'Courier New',monospace;color:var(--danger)" id="hdr-noanswer">0</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:9px;color:#ff7043;font-weight:700;letter-spacing:.06em">お断り</div>
+          <div style="font-size:20px;font-weight:700;font-family:'Courier New',monospace;color:#ff7043" id="hdr-refused">0</div>
+        </div>
+      </div>
+      <button onclick="openPwModal()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px;opacity:.4">🔐</button>
+    </div>
+  </div>
+  <!-- Drive同期バー -->
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 16px;background:var(--surface);border-bottom:1px solid var(--border)">
+    <div>
+      <div style="font-size:9px;color:var(--text3);letter-spacing:.06em">DRIVE SYNC</div>
+      <div id="drive-sync-label" style="font-size:11px;color:var(--text2)">未設定</div>
+    </div>
+    <div style="display:flex;gap:6px">
+      <button onclick="loadFromDrive()" id="btn-drive-load" style="background:none;border:1px solid var(--border);color:var(--text2);border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:inherit">☁️ 読込</button>
+      <button onclick="saveToDrive()"   id="btn-drive-save" style="background:none;border:1px solid var(--border);color:var(--text2);border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:inherit">☁️ 保存</button>
+      <button onclick="buildTodayList()" style="background:none;border:1px solid #ffd54f;color:#ffd54f;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:inherit">📋 今日のリスト</button>
+      <button onclick="openDriveSettings()" style="background:none;border:1px solid var(--border);color:var(--text3);border-radius:7px;padding:5px 8px;font-size:12px;cursor:pointer">⚙️</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- CALL TAB -->
+    <div class="tab active" id="tab-call">
+      <!-- Pending result -->
+      <div id="pending-panel" style="display:none" class="pending-panel">
+        <div class="pending-title">📋 通話結果を記録してください</div>
+        <div id="pending-name" style="font-size:16px;font-weight:700;margin-bottom:3px"></div>
+        <div id="pending-phone" style="font-family:var(--mono);font-size:13px;color:var(--text2);margin-bottom:12px"></div>
+        <div style="margin-bottom:14px">
+          <div class="section-label" style="margin-bottom:6px">📝 一言メモ（任意）</div>
+          <textarea id="call-memo" placeholder="例：折り返し希望、来週再度連絡など" rows="3" style="min-height:70px"></textarea>
+        </div>
+        <div style="margin-bottom:14px">
+          <div class="section-label" style="margin-bottom:6px">🛒 注文日（注文有りの場合）</div>
+          <input type="date" id="order-date" style="font-family:var(--mono)">
+        </div>
+        <div style="margin-bottom:14px">
+          <div class="section-label" style="margin-bottom:6px">📅 次回連絡日</div>
+          <input type="date" id="next-contact-date" style="font-family:var(--mono)">
+          <div style="font-size:11px;color:var(--text2);margin-top:5px">空欄の場合は連絡間隔の設定で自動計算</div>
+        </div>
+        <div class="section-label" style="margin-bottom:8px">結果を選択</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:8px">
+          <button class="result-btn" style="border-color:#3dd9a4;color:#3dd9a4" onclick="recordResult('answered')">✅ 通話できた</button>
+          <button class="result-btn" style="border-color:#a78bfa;color:#a78bfa" onclick="recordResult('ordered')">🛒 注文有り</button>
+          <button class="result-btn" style="border-color:#f5a623;color:#f5a623" onclick="recordResult('voicemail')">📼 留守電</button>
+          <button class="result-btn" style="border-color:#e84545;color:#e84545" onclick="recordResult('no_answer')">❌ 不在</button>
+          <button class="result-btn" style="border-color:#ff7043;color:#ff7043;grid-column:1/-1" onclick="recordResult('refused')">🚫 お断り</button>
+        </div>
+        <button class="result-btn" style="border-color:#8892aa;color:#8892aa;width:100%;font-size:12px;padding:9px" onclick="recordResult('skipped')">⏭ スキップ</button>
+      </div>
+
+      <!-- No contacts -->
+      <div id="no-contacts" class="card" style="display:none;text-align:center;padding:40px 20px">
+        <div style="font-size:44px;margin-bottom:12px">📱</div>
+        <div style="color:var(--text2);font-size:15px;line-height:1.6">「連絡先」タブから<br>番号を追加してください</div>
+      </div>
+
+      <!-- Current contact -->
+      <div id="call-card" class="card" style="display:none;padding:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span class="section-label" style="margin:0">次のコール先</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="progress-text" style="display:none"></span>
+            <span id="order-age-label" style="font-size:13px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.06em;display:none"></span>
+            <span id="overdue-count" style="font-size:11px;color:var(--danger);font-weight:600"></span>
+            <button id="call-card-delete" onclick="" style="background:none;border:none;color:var(--text3);font-size:17px;cursor:pointer;padding:1px 3px;line-height:1">🗑</button>
+          </div>
+        </div>
+        <div id="progress-dots" style="display:none"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+          <div id="current-name" style="font-size:20px;font-weight:700"></div>
+          <button onclick="toggleCallSettings()" id="call-settings-btn" style="background:none;border:1px solid var(--border);color:var(--text2);border-radius:8px;padding:4px 9px;font-size:13px;cursor:pointer;font-family:inherit;flex-shrink:0;margin-left:8px">⚙️</button>
+        </div>
+        <div id="call-card-settings" style="display:none;background:var(--surface2);border-radius:10px;padding:12px;margin-bottom:8px;border:1px solid var(--accent)">
+          <div style="font-size:11px;color:var(--accent);font-weight:700;letter-spacing:.1em;margin-bottom:10px">連絡先を編集</div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <input type="text"   id="cs-name"     placeholder="名前">
+            <input type="tel"    id="cs-phone"    placeholder="電話番号">
+            <div style="display:flex;align-items:center;gap:8px">
+              <label style="font-size:12px;color:var(--text2);white-space:nowrap">連絡間隔</label>
+              <input type="number" id="cs-interval" min="1" max="365" style="width:70px;text-align:center">
+              <span style="font-size:12px;color:var(--text2)">日</span>
+            </div>
+            <input type="text" id="cs-group" placeholder="グループ名（任意）">
+            <input type="text" id="cs-peakmonths" placeholder="繁忙月（例: 3,12）　← 季節フラグ">
+            <input type="text" id="cs-nexttalk" placeholder="💬 次回の話題（例：新ボジョレー案内）">
+            <div style="display:flex;gap:8px;margin-top:2px">
+              <button class="btn-primary" style="flex:1;padding:9px;font-size:13px" onclick="saveCallSettings()">保存</button>
+              <button class="btn-ghost"   style="flex:1;padding:9px;font-size:13px" onclick="toggleCallSettings()">キャンセル</button>
+            </div>
+            <button class="btn-ghost" style="width:100%;padding:9px;font-size:13px;margin-top:6px;border-color:#a78bfa;color:#a78bfa" onclick="openOrderModalForCurrent()">🛒 過去注文を入力</button>
+          </div>
+        </div>
+        <div id="current-phone" style="font-family:var(--mono);font-size:18px;color:var(--accent);letter-spacing:.06em;margin-bottom:2px"></div>
+        <div id="current-phone2" style="font-family:var(--mono);font-size:13px;color:var(--text2);margin-bottom:2px;display:none"></div>
+        <div id="current-address" style="font-size:12px;color:var(--text2);margin-bottom:2px;min-height:0"></div>
+        <div id="current-customer-info" style="font-size:11px;color:var(--text3);margin-bottom:4px;display:none"></div>
+        <div id="current-score" style="font-size:11px;margin-bottom:4px;min-height:16px"></div>
+        <div id="current-nexttalk" style="display:none;font-size:13px;color:#ffd54f;background:rgba(255,213,79,0.1);border-left:3px solid #ffd54f;border-radius:0 6px 6px 0;padding:5px 10px;margin-bottom:6px"></div>
+        <div id="current-absent-alert" style="display:none;font-size:12px;color:#ef5350;background:rgba(239,83,80,0.1);border-radius:6px;padding:5px 10px;margin-bottom:4px"></div>
+        <div id="current-badges" style="margin-bottom:4px;min-height:18px;display:flex;flex-wrap:wrap;gap:4px"></div>
+        <div id="current-days" style="margin-bottom:8px;min-height:20px"></div>
+        <div id="past-calls" style="margin-bottom:8px;display:none">
+          <div id="past-calls-list" style="font-size:11px;color:var(--text3)"></div>
+        </div>
+        <a class="call-btn" id="call-btn" onclick="logCall(event)" style="padding:16px;font-size:19px">📞　コール</a>
+        <div class="two-btn-row">
+          <button class="btn-ghost" style="padding:9px" onclick="skipCurrent()">⏭ スキップして次へ</button>
+          <button class="back-btn" id="back-btn" onclick="goBack()" disabled>← 戻る</button>
+        </div>
+        <hr class="info-divider">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-size:10px;color:var(--text2);font-weight:700;letter-spacing:.08em;text-transform:uppercase">顧客情報</span>
+          <button onclick="saveInfoManual()" id="info-save-btn" style="background:none;border:1px solid var(--border);color:var(--text2);border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:inherit">💾 保存</button>
+        </div>
+        <div class="info-grid">
+          <div class="info-cell"><label>好み</label><textarea id="info-likes" rows="2" placeholder="例：甘口、サイズS" style="min-height:48px;resize:none"></textarea></div>
+          <div class="info-cell"><label>配送の指定</label><textarea id="info-delivery" rows="2" placeholder="例：午前指定" style="min-height:48px;resize:none"></textarea></div>
+          <div class="info-cell"><label>支払い方法</label><textarea id="info-payment" rows="2" placeholder="例：カード" style="min-height:48px;resize:none"></textarea></div>
+          <div class="info-cell"><label>その他基本情報</label><textarea id="info-notes" rows="2" placeholder="例：担当者名など" style="min-height:48px;resize:none"></textarea></div>
+        </div>
+        <div id="recent-memo-section" style="display:none;margin-top:8px">
+          <div style="font-size:10px;color:var(--text2);font-weight:700;letter-spacing:.08em;margin-bottom:4px">💬 直近のメモ</div>
+          <div id="recent-memo-text" style="font-size:12px;color:var(--text2);background:var(--surface2);border-radius:7px;padding:7px 10px;border-left:2px solid var(--amber);line-height:1.5"></div>
+          <div id="recent-memo-date" style="font-size:10px;color:var(--text3);margin-top:3px"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CONTACTS TAB -->
+    <div class="tab" id="tab-contacts">
+      <div class="card">
+        <div class="section-label">連絡先を追加</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <input type="text" id="add-name" placeholder="名前" />
+          <input type="tel" id="add-phone" placeholder="電話番号（例: 090-1234-5678）" />
+          <button class="btn-primary" onclick="addContact()">＋ 追加</button>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:13px;color:var(--text2)" id="contacts-count"></span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn-ghost" style="width:auto;padding:6px 10px;font-size:11px" onclick="saveToDrive()">☁️ 保存</button>
+          <button class="btn-ghost" style="width:auto;padding:6px 10px;font-size:11px" onclick="loadFromDrive()">☁️ 読込</button>
+          <button class="btn-ghost" style="width:auto;padding:6px 10px;font-size:11px;color:#4ade80;border-color:#4ade80" id="btn-import-customers" onclick="importCustomersFromDrive()">📥 顧客取込</button>
+          <button class="btn-ghost" style="width:auto;padding:6px 10px;font-size:11px;color:#a78bfa;border-color:#a78bfa" id="btn-import-orders" onclick="importOrdersFromApp()">📦 注文取込</button>
+          <button class="btn-ghost" style="width:auto;padding:7px 14px;font-size:12px" onclick="openImportModal()">📂 CSV</button>
+          <button class="btn-ghost" style="width:auto;padding:7px 14px;font-size:12px" onclick="exportContacts()">💾 出力</button>
+        </div>
+      </div>
+
+      <!-- 検索ボックス -->
+      <div style="position:relative;margin-bottom:10px">
+        <input type="search" id="contact-search" placeholder="🔍 名前・電話末尾4桁・顧客番号9桁" oninput="render()"
+          style="padding-right:36px;padding-top:13px;padding-bottom:13px;font-size:16px">
+        <button onclick="document.getElementById('contact-search').value='';render()"
+          style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;padding:0">×</button>
+      </div>
+
+      <div id="contacts-list"></div>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div class="tab" id="tab-history">
+      <!-- 全データバックアップ -->
+      <div class="card" style="margin-bottom:12px;padding:12px">
+        <div style="font-size:11px;color:var(--text2);font-weight:700;letter-spacing:.1em;margin-bottom:8px">📦 全データバックアップ（バージョン移行用）</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-ghost" style="flex:1;font-size:12px;padding:8px" onclick="exportAllData()">⬆️ 出力（JSON）</button>
+          <label style="flex:1">
+            <span class="btn-ghost" style="display:block;font-size:12px;padding:8px;text-align:center;cursor:pointer">⬇️ 読込（JSON）</span>
+            <input type="file" accept=".json" onchange="importAllData(event)">
+          </label>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-size:13px;color:var(--text2)" id="logs-count"></span>
+        <div style="display:flex;gap:8px">
+          <button class="btn-ghost" style="width:auto;padding:7px 14px;font-size:12px" onclick="exportLogs()">💾 CSV出力</button>
+          <button class="btn-ghost" style="width:auto;padding:7px 14px;font-size:12px" onclick="showMonthlyReport()">📊 月次レポート</button>
+          <button class="btn-danger" onclick="clearLogs()">全削除</button>
+        </div>
+      </div>
+      <div id="logs-list"></div>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <nav class="nav">
+    <button class="nav-btn active" id="nav-call" onclick="switchTab('call')">
+      <span class="nav-icon">📞</span>コール
+    </button>
+    <button class="nav-btn" id="nav-contacts" onclick="switchTab('contacts')">
+      <span class="nav-icon">👥</span>連絡先
+    </button>
+    <button class="nav-btn" id="nav-history" onclick="switchTab('history')">
+      <span class="nav-icon">📋</span>履歴
+    </button>
+  </nav>
+</div>
+
+<!-- Import Modal -->
+<div class="modal-overlay" id="import-modal" style="display:none" onclick="closeImportModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">
+      <button class="modal-close" onclick="closeImportModal()">×</button>
+      📂 連絡先インポート
+    </div>
+
+    <div class="import-tab-btns">
+      <button class="import-tab-btn active" id="itab-file" onclick="switchImportTab('file')">ファイル選択</button>
+      <button class="import-tab-btn" id="itab-paste" onclick="switchImportTab('paste')">貼り付け</button>
+    </div>
+
+    <!-- File import -->
+    <div id="import-file-panel">
+      <input type="file" id="csv-file-input" accept=".csv,.txt" onchange="handleFileSelect(event)">
+      <div class="import-area" id="import-dropzone" onclick="document.getElementById('csv-file-input').click()">
+        <div class="import-icon">📄</div>
+        <div style="font-size:15px;font-weight:600">CSVファイルを選択</div>
+        <div class="import-hint">形式: 名前,電話番号（1行1件）<br>または 電話番号のみ（1行1件）</div>
+      </div>
+    </div>
+
+    <!-- Paste import -->
+    <div id="import-paste-panel" style="display:none">
+      <div class="section-label">テキストを貼り付け</div>
+      <textarea id="paste-input" placeholder="形式例：&#10;田中太郎,090-1234-5678&#10;山田花子,080-9876-5432&#10;&#10;電話番号のみも可：&#10;090-1111-2222&#10;080-3333-4444" rows="6"></textarea>
+      <button class="btn-primary" style="margin-top:10px" onclick="parsePasteInput()">解析する</button>
+    </div>
+
+    <!-- Preview -->
+    <div id="import-preview" style="display:none;margin-top:16px">
+      <div class="section-label" style="margin-bottom:8px">プレビュー (<span id="preview-count"></span>件)</div>
+      <div id="preview-list" style="max-height:200px;overflow-y:auto;margin-bottom:14px"></div>
+      <div class="section-label">追加方法</div>
+      <div class="radio-group">
+        <button class="radio-btn"        id="mode-append"  onclick="setImportMode('append')">末尾に追加</button>
+        <button class="radio-btn active"  id="mode-merge"   onclick="setImportMode('merge')">上書き更新</button>
+        <button class="radio-btn"        id="mode-replace" onclick="setImportMode('replace')">全置き換え</button>
+      </div>
+      <div id="mode-desc" style="font-size:11px;color:var(--text2);margin-bottom:14px">名前 or 電話番号が一致する場合は上書き。一致しない場合は追加します</div>
+      <button class="btn-primary" onclick="executeImport()">インポート実行</button>
+    </div>
+  </div>
+</div>
+
+<!-- Load notice toast -->
+<div id="load-notice" style="display:none;position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#1a4035;border:1px solid var(--accent);color:var(--accent);border-radius:10px;padding:10px 18px;font-size:13px;font-weight:600;z-index:300;align-items:center;gap:8px;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.4)">
+  ✅ 保存データを読み込みました
+</div>
+
+<script>
+// ===== Auth =====
+const PW_KEY = 'autocall_pw';
+const SESSION_KEY = 'autocall_session';
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function checkAuth() {
+  // 旧バージョンのキーから自動移行
+  if (!localStorage.getItem(PW_KEY)) {
+    const old1 = localStorage.getItem('autocall_pw1');
+    if (old1) {
+      localStorage.setItem(PW_KEY, old1);
+      localStorage.removeItem('autocall_pw1');
+      localStorage.removeItem('autocall_pw2');
+    }
+  }
+  if (sessionStorage.getItem(SESSION_KEY)) {
+    document.getElementById('auth-overlay').style.display = 'none';
+    return;
+  }
+  if (!localStorage.getItem(PW_KEY)) {
+    document.getElementById('auth-login').style.display = 'none';
+    document.getElementById('auth-setup').style.display = '';
+  }
+}
+
+async function attemptLogin() {
+  const pw = document.getElementById('auth-pw').value;
+  if (!pw) { document.getElementById('auth-error').textContent = 'パスワードを入力してください'; return; }
+  if (await sha256(pw) === localStorage.getItem(PW_KEY)) {
+    sessionStorage.setItem(SESSION_KEY, '1');
+    document.getElementById('auth-overlay').style.display = 'none';
+    document.getElementById('auth-pw').value = '';
+  } else {
+    document.getElementById('auth-error').textContent = 'パスワードが違います';
+    document.getElementById('auth-pw').value = '';
+  }
+}
+
+async function savePasswords() {
+  const pw = document.getElementById('setup-pw1').value;
+  if (!pw) { document.getElementById('setup-error').textContent = 'パスワードを入力してください'; return; }
+  localStorage.setItem(PW_KEY, await sha256(pw));
+  sessionStorage.setItem(SESSION_KEY, '1');
+  document.getElementById('auth-overlay').style.display = 'none';
+}
+
+function resetPassword() {
+  if (!confirm('パスワードをリセットして再設定します。\nデータ（連絡先・履歴）は保持されます。\n\nよろしいですか？')) return;
+  localStorage.removeItem(PW_KEY);
+  localStorage.removeItem('autocall_pw1');
+  localStorage.removeItem('autocall_pw2');
+  sessionStorage.removeItem(SESSION_KEY);
+  document.getElementById('auth-login').style.display = 'none';
+  document.getElementById('auth-setup').style.display = '';
+  document.getElementById('setup-error').textContent = '';
+}
+
+function openPwModal() { document.getElementById('pw-modal').style.display = 'flex'; }
+function closePwModal(e) {
+  if (!e || e.target === document.getElementById('pw-modal'))
+    document.getElementById('pw-modal').style.display = 'none';
+}
+
+async function changePasswords() {
+  const cur = document.getElementById('pw-current').value;
+  const n1  = document.getElementById('pw-new1').value;
+  const err = document.getElementById('pw-error');
+  if (!cur || !n1) { err.textContent = 'すべて入力してください'; return; }
+  if (await sha256(cur) !== localStorage.getItem(PW_KEY)) { err.textContent = '現在のパスワードが違います'; return; }
+  localStorage.setItem(PW_KEY, await sha256(n1));
+  err.style.color = 'var(--accent)';
+  err.textContent = '✅ 変更しました';
+  setTimeout(() => { closePwModal(); err.textContent = ''; err.style.color = 'var(--danger)'; }, 1200);
+  document.getElementById('pw-current').value = '';
+  document.getElementById('pw-new1').value = '';
+}
+
+// ===== 顧客取込（Drive の customer_extraction から）=====
+async function importCustomersFromDrive() {
+  const { url, key } = getDriveConfig();
+  if (!url || !key) { openDriveSettings(); return; }
+  const btn = document.getElementById('btn-import-customers');
+  if (btn) { btn.disabled = true; btn.textContent = '取込中…'; }
+  try {
+    const r = await fetch(`${url}?action=import_customers&key=${encodeURIComponent(key)}`, { redirect: 'follow' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const json = await r.json();
+    if (json.error) throw new Error(json.error);
+    if (!json.contacts?.length) { alert('顧客データが見つかりませんでした'); return; }
+
+    // プレビューモーダルを流用
+    excelImportData = json.contacts;
+    excelImportMode = 'merge';
+    document.getElementById('excel-file-info').textContent = `ファイル: ${json.fileName || 'customer_extraction'} (${json.count}件)`;
+    document.getElementById('excel-count').textContent = json.contacts.length;
+    const list = document.getElementById('excel-preview-list');
+    list.innerHTML = json.contacts.slice(0, 30).map(c => `
+      <div style="border-bottom:1px solid var(--border);padding:6px 0;display:flex;gap:8px">
+        <div style="flex:1">
+          <span style="font-weight:600">${escHtml(c.name)}</span>
+          <span style="color:var(--text3);font-size:11px;margin-left:6px">${escHtml(c.customerNo||'')}</span><br>
+          <span style="font-family:var(--mono);font-size:14px;color:var(--text2)">${escHtml(c.phone)}</span>
+        </div>
+        <div style="text-align:right;font-size:11px;color:var(--text3)">
+          ${c.lastOrderDate ? formatDateJPFull(c.lastOrderDate) : ''}
+        </div>
+      </div>`).join('') + (json.contacts.length > 30 ? `<div style="color:var(--text3);font-size:12px;padding:8px">…他${json.contacts.length-30}件</div>` : '');
+    document.getElementById('excel-modal').style.display = 'flex';
+  } catch(e) {
+    alert('エラー: ' + e.message);
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '📥 顧客取込'; }
+}
+
+
+// ===== 📦 注文データ取込（order_list スプレッドシートから）=====
+let pendingOrders = [];
+
+async function importOrdersFromApp() {
+  const { url, key } = getDriveConfig();
+  if (!url || !key) { openDriveSettings(); return; }
+  const btn = document.getElementById('btn-import-orders');
+  if (btn) { btn.disabled = true; btn.textContent = '取込中…'; }
+  try {
+    const r = await fetch(`${url}?action=import_orders&key=${encodeURIComponent(key)}`, { redirect: 'follow' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const json = await r.json();
+    if (json.error) throw new Error(json.error);
+    if (!json.orders?.length) { alert('注文データが見つかりませんでした'); return; }
+
+    // 既存の連絡先とマッチング（CC番号で照合）
+    const matched = [], skipped = [];
+    const byCC = {};
+    json.orders.forEach(o => {
+      if (!byCC[o.customerNo]) byCC[o.customerNo] = [];
+      byCC[o.customerNo].push(o);
+    });
+
+    Object.entries(byCC).forEach(([cc, orders]) => {
+      const contact = contacts.find(c => c.customerNo === cc || c.customerNo === cc.replace('CC',''));
+      if (!contact) { skipped.push(cc); return; }
+      orders.forEach(o => { matched.push({ ...o, contactId: contact.id, contactName: contact.name }); });
+    });
+
+    pendingOrders = matched;
+
+    // プレビュー表示
+    document.getElementById('order-import-info').innerHTML =
+      `<span style="color:var(--accent)">✅ マッチ: ${Object.keys(byCC).length - skipped.length}名</span>　` +
+      `<span style="color:var(--text3)">スキップ: ${skipped.length}名（未登録）</span>　` +
+      `<span style="color:#a78bfa">注文件数: ${matched.length}件</span>`;
+
+    // 顧客ごとにグループ表示
+    const grouped = {};
+    matched.forEach(o => {
+      if (!grouped[o.customerNo]) grouped[o.customerNo] = { name: o.contactName, orders: [] };
+      grouped[o.customerNo].orders.push(o);
+    });
+
+    document.getElementById('order-import-preview').innerHTML =
+      Object.entries(grouped).map(([cc, g]) => {
+        // 既存ログとの重複チェック
+        const contact = contacts.find(c => c.customerNo === cc);
+        const existDates = new Set(
+          logs.filter(l => String(l.contactId) === String(contact?.id) && l.result === 'ordered')
+              .map(l => l.orderDate)
+        );
+        const rows = g.orders.map(o => {
+          const isDup = existDates.has(o.orderDate);
+          return `<tr style="opacity:${isDup ? 0.4 : 1}">
+            <td style="padding:4px 6px;color:var(--text2)">${o.orderDate}</td>
+            <td style="padding:4px 6px;color:var(--text2)">${escHtml(o.productName)}</td>
+            <td style="padding:4px 6px;text-align:right">${o.quantity}</td>
+            <td style="padding:4px 6px;text-align:right">¥${o.unitPrice.toLocaleString()}</td>
+            <td style="padding:4px 6px;font-size:10px;color:${isDup ? 'var(--danger)' : 'var(--accent)'}">${isDup ? '重複' : '新規'}</td>
+          </tr>`;
+        }).join('');
+        return `<div style="margin-bottom:10px">
+          <div style="font-weight:700;font-size:13px;margin-bottom:4px">${escHtml(g.name)} <span style="color:var(--text3);font-size:11px">${cc}</span></div>
+          <table style="width:100%;border-collapse:collapse">
+            <tr style="font-size:10px;color:var(--text3)">
+              <th style="padding:3px 6px;text-align:left">日付</th>
+              <th style="padding:3px 6px;text-align:left">商品名</th>
+              <th style="padding:3px 6px;text-align:right">数量</th>
+              <th style="padding:3px 6px;text-align:right">単価</th>
+              <th style="padding:3px 6px"></th>
+            </tr>
+            ${rows}
+          </table>
+        </div>`;
+      }).join('<hr style="border-color:var(--border);margin:8px 0">');
+
+    document.getElementById('order-import-modal').style.display = 'flex';
+  } catch(e) {
+    alert('エラー: ' + e.message);
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '📦 注文取込'; }
+}
+
+function closeOrderImportModal(e) {
+  if (!e || e.target === document.getElementById('order-import-modal'))
+    document.getElementById('order-import-modal').style.display = 'none';
+}
+
+function executeOrderImport() {
+  if (!pendingOrders.length) return;
+  let added = 0, skipped = 0;
+
+  pendingOrders.forEach(o => {
+    const contact = contacts.find(c => String(c.id) === String(o.contactId));
+    if (!contact) return;
+    const already = logs.some(l =>
+      String(l.contactId) === String(o.contactId) &&
+      l.result === 'ordered' &&
+      l.orderDate === o.orderDate
+    );
+    if (already) { skipped++; return; }
+    // lastOrderDate を最新注文日に更新
+    const curLast = normDateStr(contact.lastOrderDate);
+    if (!curLast || o.orderDate > curLast) {
+      contacts = contacts.map(c =>
+        String(c.id) === String(o.contactId) ? { ...c, lastOrderDate: o.orderDate } : c
+      );
+    }
+    logs.unshift({
+      id:              'c_' + Date.now() + '_' + Math.floor(Math.random() * 9999),
+      contactId:       contact.id,
+      name:            contact.name,
+      phone:           contact.phone,
+      calledAt:        o.orderDate + 'T00:00:00.000Z',
+      result:          'ordered',
+      memo:            `${o.productName}　数量:${o.quantity}　単価:¥${o.unitPrice.toLocaleString()}`,
+      nextContactDate: null,
+      orderDate:       o.orderDate,
+      orderAmount:     o.unitPrice * o.quantity
+    });
+    added++;
+  });
+
+  // logs を日付順にソート
+  logs.sort((a, b) => new Date(b.calledAt) - new Date(a.calledAt));
+  save();
+  ensureLastOrderDateLogged();
+  syncSmartIntervals();
+  render();
+  closeOrderImportModal();
+  alert(`✅ ${added}件取込完了（重複スキップ: ${skipped}件）`);
+}
+
+// ===== スマートマージ（取込時のフィールド優先制御）=====
+function smartMergeContact(existing, nc) {
+  // lastOrderDate が新しくなる場合、古い日付を logs に自動保存
+  if (existing.lastOrderDate && nc.lastOrderDate &&
+      nc.lastOrderDate > existing.lastOrderDate) {
+    const alreadyLogged = logs.some(l =>
+      String(l.contactId) === String(existing.id) &&
+      l.result === 'ordered' &&
+      (l.orderDate === existing.lastOrderDate ||
+       (l.calledAt || '').startsWith(existing.lastOrderDate))
+    );
+    if (!alreadyLogged) {
+      logs.unshift({
+        id:              'c_' + Date.now() + '_' + Math.floor(Math.random() * 9999),
+        contactId:       existing.id,
+        name:            existing.name,
+        phone:           existing.phone,
+        calledAt:        existing.lastOrderDate + 'T00:00:00.000Z',
+        result:          'ordered',
+        memo:            '顧客システム記録（取込時自動保存）',
+        nextContactDate: null,
+        orderDate:       existing.lastOrderDate,
+        orderAmount:     0
+      });
+    }
+  }
+
+  const merged = { ...existing, ...nc, id: existing.id };
+
+  // phone2: 新規がnullなら既存を保持（手入力済みのものを消さない）
+  merged.phone2 = nc.phone2 || existing.phone2 || null;
+
+  // lastOrderDate: 新旧の新しい方を保持
+  if (existing.lastOrderDate && nc.lastOrderDate) {
+    merged.lastOrderDate = existing.lastOrderDate > nc.lastOrderDate
+      ? existing.lastOrderDate : nc.lastOrderDate;
+  } else {
+    merged.lastOrderDate = existing.lastOrderDate || nc.lastOrderDate || null;
+  }
+
+  // interval: ユーザーが変更済みなら保持
+  if (existing.interval && existing.interval !== DEFAULT_INTERVAL) {
+    merged.interval = existing.interval;
+  }
+
+  // info: 既存入力を優先
+  merged.info = {
+    likes:    existing.info?.likes    || nc.info?.likes    || '',
+    delivery: existing.info?.delivery || nc.info?.delivery || '',
+    payment:  existing.info?.payment  || nc.info?.payment  || '',
+    notes:    existing.info?.notes    || nc.info?.notes    || '',
+  };
+
+  // アプリ固有フィールドは常に既存を保持
+  merged.nextTalk       = existing.nextTalk       || null;
+  merged.peakMonths     = existing.peakMonths?.length ? existing.peakMonths : (nc.peakMonths || []);
+  merged.group          = existing.group          || nc.group || null;
+  merged.address        = existing.address        || null;
+  merged.groupBoostedAt = existing.groupBoostedAt || null;
+
+  return merged;
+}
+
+// ===== Excel顧客取込 =====
+let excelImportData = [];
+let excelImportMode = 'merge';
+
+function handleExcelImport(e) {
+  if (typeof XLSX === 'undefined') {
+    alert('Excelライブラリが読み込めていません。\nインターネット接続を確認して再読み込みしてください。');
+    return;
+  }
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = new Uint8Array(ev.target.result);
+      const wb = XLSX.read(data, { type: 'array', cellDates: true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+      excelImportData = [];
+      rows.forEach(row => {
+        const customerNo = String(row[2] || '').trim();
+        if (!customerNo.startsWith('CC')) return;
+        const name = String(row[3] || '').trim();
+        if (!name) return;
+        const postal = String(row[6] || '').replace(/[^\d]/g, '');
+        const phone1 = String(row[7] || '').trim();
+        const phone2 = String(row[9] || '').trim();
+        let lastOrder = '';
+        const rawDate = row[15];
+        if (rawDate instanceof Date) {
+          lastOrder = `${rawDate.getFullYear()}-${String(rawDate.getMonth()+1).padStart(2,'0')}-${String(rawDate.getDate()).padStart(2,'0')}`;
+        } else if (rawDate && String(rawDate).match(/\d{4}/)) {
+          lastOrder = String(rawDate).slice(0, 10);
+        }
+        excelImportData.push({
+          id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 9999),
+          name,
+          phone: phone1,
+          phone2: phone2 || null,
+          interval: 45,
+          customerNo,
+          postalCode: postal || null,
+          lastOrderDate: lastOrder || null,
+          info: { likes: '', delivery: '', payment: '', notes: `顧客番号: ${customerNo}` }
+        });
+      });
+
+      if (!excelImportData.length) {
+        alert('顧客データが見つかりませんでした（CC番号の行が見つかりません）');
+        e.target.value = ''; return;
+      }
+      document.getElementById('excel-file-info').textContent = `ファイル: ${file.name}`;
+      document.getElementById('excel-count').textContent = excelImportData.length;
+      const list = document.getElementById('excel-preview-list');
+      list.innerHTML = excelImportData.map(c => `
+        <div style="border-bottom:1px solid var(--border);padding:6px 0;display:flex;gap:8px;align-items:flex-start">
+          <div style="flex:1">
+            <span style="font-weight:600">${escHtml(c.name)}</span>
+            <span style="color:var(--text3);font-size:11px;margin-left:6px">${escHtml(c.customerNo)}</span><br>
+            <span style="font-family:var(--mono);font-size:14px;color:var(--text2)">${escHtml(c.phone)}</span>
+            ${c.phone2 ? `<span style="font-family:var(--mono);font-size:11px;color:var(--text3);margin-left:6px">${escHtml(c.phone2)}</span>` : ''}
+          </div>
+          <div style="text-align:right;font-size:11px;color:var(--text3)">
+            〒${escHtml(c.postalCode||'')}<br>
+            ${c.lastOrderDate ? '🛒 '+c.lastOrderDate : ''}
+          </div>
+        </div>`).join('');
+      document.getElementById('excel-modal').style.display = 'flex';
+    } catch(err) { alert('読み込みエラー: ' + err.message); }
+    e.target.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function setExcelMode(mode) {
+  excelImportMode = mode;
+  ['merge','append','replace'].forEach(m => {
+    document.getElementById('xmode-'+m).classList.toggle('active', m === mode);
+  });
+  const descs = {
+    merge:   '名前 or 電話番号 or 顧客番号が一致する場合は上書き。一致しない場合は追加',
+    append:  'すべて末尾に追加（重複チェックなし）',
+    replace: '既存の連絡先をすべて削除して置き換え'
+  };
+  document.getElementById('excel-mode-desc').textContent = descs[mode];
+}
+
+function closeExcelModal(e) {
+  if (!e || e.target === document.getElementById('excel-modal'))
+    document.getElementById('excel-modal').style.display = 'none';
+}
+
+function executeExcelImport() {
+  if (!excelImportData.length) return;
+  if (excelImportMode === 'replace') {
+    if (!confirm(`既存の ${contacts.length} 件を削除して ${excelImportData.length} 件を取り込みます。よろしいですか？`)) return;
+    contacts = excelImportData; currentIdx = 0;
+  } else if (excelImportMode === 'merge') {
+    excelImportData.forEach(nc => {
+      const i = contacts.findIndex(c =>
+        c.name === nc.name || c.phone === nc.phone ||
+        (nc.customerNo && c.customerNo === nc.customerNo));
+      if (i >= 0) contacts[i] = smartMergeContact(contacts[i], nc);
+      else contacts.push(nc);
+    });
+  } else {
+    contacts.push(...excelImportData);
+  }
+  save(); render(); closeExcelModal();
+  switchTab('contacts');
+  ensureLastOrderDateLogged();
+  alert(`✅ ${excelImportData.length} 件を取り込みました`);
+}
+
+
+
+// ===== 📋 今日のコールリスト（起動時ダッシュボード）=====
+function buildTodayList() {
+  if (!contacts.length) return;
+  const now    = Date.now();
+  const rankMap = calcAllRanks();
+
+  // 全連絡先をスコアでソート
+  const scored = contacts.map(c => {
+    const rank    = rankMap.get(String(c.id)) || 999;
+    const score   = calculatePriorityScore(c.id);
+    const dueDate = getNextDueDate(c.id);
+    const daysUntil = dueDate && !isNaN(dueDate.getTime())
+      ? Math.ceil((dueDate.getTime() - now) / 86400000)
+      : (c.lastOrderDate ? 999 : -999);
+    const anomaly = detectAnomaly(c.id);
+    const tier    = getCustomerTier(c.id);
+    return { c, rank, score, daysUntil, anomaly, tier };
+  }).sort((a, b) => a.daysUntil - b.daysUntil || b.score - a.score);
+
+  // 3グループに分類
+  const mustCall  = scored.filter(x => x.daysUntil <= 0 || x.tier.key === 'A');
+  const anomalies = scored.filter(x => x.anomaly && !mustCall.includes(x)).slice(0, 10);
+  const normal    = scored.filter(x =>
+    !mustCall.includes(x) && !anomalies.includes(x) && x.daysUntil <= 7
+  ).slice(0, 20);
+
+  // サマリーバッジ
+  document.getElementById('today-summary').innerHTML = `
+    <div style="background:rgba(239,83,80,0.15);border:1px solid #ef5350;border-radius:8px;padding:6px 12px;text-align:center;flex:1">
+      <div style="font-size:20px;font-weight:700;color:#ef5350">${mustCall.length}</div>
+      <div style="font-size:10px;color:#ef5350">🔥 必ず電話</div>
+    </div>
+    <div style="background:rgba(255,109,0,0.12);border:1px solid #ff6d00;border-radius:8px;padding:6px 12px;text-align:center;flex:1">
+      <div style="font-size:20px;font-weight:700;color:#ff6d00">${anomalies.length}</div>
+      <div style="font-size:10px;color:#ff6d00">🚨 異変検知</div>
+    </div>
+    <div style="background:rgba(255,167,38,0.12);border:1px solid #ffa726;border-radius:8px;padding:6px 12px;text-align:center;flex:1">
+      <div style="font-size:20px;font-weight:700;color:#ffa726">${normal.length}</div>
+      <div style="font-size:10px;color:#ffa726">📞 通常</div>
+    </div>`;
+
+  // リスト生成
+  function makeItem(x, groupColor) {
+    const dueTxt = x.daysUntil <= 0
+      ? `<span style="color:#ef5350;font-size:11px">${Math.abs(x.daysUntil)}日超過</span>`
+      : `<span style="color:var(--text3);font-size:11px">${x.daysUntil}日後</span>`;
+    const anomTxt = x.anomaly
+      ? `<span style="font-size:10px;color:#ff6d00"> ${x.anomaly.msg}</span>` : '';
+    return `<div onclick="jumpToContact('${x.c.id}');closeTodayModal()"
+      style="display:flex;align-items:center;gap:8px;padding:9px 10px;border-bottom:1px solid var(--border);cursor:pointer;border-left:3px solid ${groupColor}">
+      <span style="font-size:14px;padding:2px 5px;border-radius:6px;background:${x.tier.bg};color:${x.tier.color}">${x.tier.emoji}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(x.c.name)}</div>
+        <div style="font-size:11px;color:var(--text2)">${escHtml(x.c.phone)}${anomTxt}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">${dueTxt}</div>
+    </div>`;
+  }
+
+  let html = '';
+  if (mustCall.length) {
+    html += `<div style="font-size:11px;font-weight:700;color:#ef5350;padding:8px 10px 4px;letter-spacing:.06em">🔥 今日必ず電話（${mustCall.length}件）</div>`;
+    html += mustCall.slice(0, 30).map(x => makeItem(x, '#ef5350')).join('');
+  }
+  if (anomalies.length) {
+    html += `<div style="font-size:11px;font-weight:700;color:#ff6d00;padding:8px 10px 4px;letter-spacing:.06em">🚨 異変検知（${anomalies.length}件）</div>`;
+    html += anomalies.map(x => makeItem(x, '#ff6d00')).join('');
+  }
+  if (normal.length) {
+    html += `<div style="font-size:11px;font-weight:700;color:#ffa726;padding:8px 10px 4px;letter-spacing:.06em">📞 時間があれば（${normal.length}件）</div>`;
+    html += normal.map(x => makeItem(x, '#ffa726')).join('');
+  }
+  if (!mustCall.length && !anomalies.length && !normal.length) {
+    html = '<div style="text-align:center;padding:30px;color:var(--text3)">🎉 今日の優先コールはありません</div>';
+  }
+
+  document.getElementById('today-list').innerHTML = html;
+  document.getElementById('today-modal').style.display = 'flex';
+}
+
+function closeTodayModal(e) {
+  if (!e || e.target === document.getElementById('today-modal'))
+    document.getElementById('today-modal').style.display = 'none';
+}
+
+// ===== ③ 月次レポート =====
+function showMonthlyReport() {
+  const modal = document.getElementById('monthly-modal');
+  const body  = document.getElementById('monthly-report-body');
+
+  // 月別集計（過去12ヶ月）
+  const months = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(1); d.setMonth(d.getMonth() - i);
+    months.push({
+      label: `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}`,
+      year: d.getFullYear(), month: d.getMonth()
+    });
+  }
+
+  const rows = months.map(m => {
+    const monthLogs = logs.filter(l => {
+      const d = new Date(l.calledAt);
+      return d.getFullYear() === m.year && d.getMonth() === m.month && l.result !== null;
+    });
+    const calls   = monthLogs.length;
+    const orders  = monthLogs.filter(l => l.result === 'ordered').length;
+    const answered= monthLogs.filter(l => l.result === 'answered' || l.result === 'ordered').length;
+    const rate    = calls > 0 ? Math.round(orders / calls * 100) : 0;
+    const connRate= calls > 0 ? Math.round(answered / calls * 100) : 0;
+    const amount  = monthLogs.reduce((s,l) => s + (l.orderAmount||0), 0);
+    return { ...m, calls, orders, answered, rate, connRate, amount };
+  }).filter(r => r.calls > 0 || r.orders > 0);
+
+  if (!rows.length) { body.innerHTML = '<p style="color:var(--text3);padding:20px;text-align:center">記録がありません</p>'; modal.style.display='flex'; return; }
+
+  const totalCalls  = rows.reduce((s,r) => s+r.calls, 0);
+  const totalOrders = rows.reduce((s,r) => s+r.orders, 0);
+  const totalAmount = rows.reduce((s,r) => s+r.amount, 0);
+
+  body.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
+      <div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--text3)">総架電</div>
+        <div style="font-size:22px;font-weight:700;color:var(--accent)">${totalCalls}</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--text3)">総注文</div>
+        <div style="font-size:22px;font-weight:700;color:#a78bfa">${totalOrders}</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--text3)">注文率</div>
+        <div style="font-size:22px;font-weight:700;color:#ffa726">${totalCalls>0?Math.round(totalOrders/totalCalls*100):0}%</div>
+      </div>
+    </div>
+    ${totalAmount > 0 ? `<div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center;margin-bottom:16px"><span style="font-size:11px;color:var(--text3)">記録済み総金額　</span><span style="font-size:18px;font-weight:700;color:#4fc3f7">¥${totalAmount.toLocaleString()}</span></div>` : ''}
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <tr style="background:var(--surface2)">
+        <th style="padding:6px;text-align:left">月</th>
+        <th style="padding:6px;text-align:right">架電</th>
+        <th style="padding:6px;text-align:right">通話率</th>
+        <th style="padding:6px;text-align:right">注文</th>
+        <th style="padding:6px;text-align:right">注文率</th>
+        ${totalAmount>0?'<th style="padding:6px;text-align:right">金額</th>':''}
+      </tr>
+      ${rows.map(r => `
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:6px;color:var(--text2)">${r.label}</td>
+        <td style="padding:6px;text-align:right">${r.calls}</td>
+        <td style="padding:6px;text-align:right;color:var(--accent)">${r.connRate}%</td>
+        <td style="padding:6px;text-align:right;color:#a78bfa">${r.orders}</td>
+        <td style="padding:6px;text-align:right;color:${r.rate>=20?'#ffa726':r.rate>=10?'var(--text2)':'var(--text3)'}">${r.rate}%</td>
+        ${totalAmount>0?`<td style="padding:6px;text-align:right;color:#4fc3f7">${r.amount>0?'¥'+r.amount.toLocaleString():'-'}</td>`:''}
+      </tr>`).join('')}
+    </table></div>
+    <div style="font-size:11px;color:var(--text3);margin-top:10px;text-align:center">通話率=通話+注文÷全架電 / 注文率=注文÷全架電</div>
+  `;
+  modal.style.display = 'flex';
+}
+
+function closeMonthlyModal(e) {
+  if (!e || e.target === document.getElementById('monthly-modal'))
+    document.getElementById('monthly-modal').style.display = 'none';
+}
+
+// ===== 過去注文入力 =====
+let orderModalContactId = null;
+
+function openOrderModal(contactId) {
+  const sid = String(contactId);
+  const c = contacts.find(c => String(c.id) === sid);
+  if (!c) return;
+  orderModalContactId = contactId;
+
+  document.getElementById('order-modal-name').textContent  = c.name;
+  document.getElementById('order-modal-phone').textContent = c.phone;
+
+  // 既存注文日を表示
+  const existing = getOrderDates(contactId);
+  const existSec = document.getElementById('order-existing-section');
+  if (existing.length) {
+    existSec.style.display = '';
+    document.getElementById('order-existing-list').innerHTML =
+      existing.map(d => `<div style="padding:4px 0;border-bottom:1px solid var(--border)">
+        🛒 ${formatDateJPFull(d)}</div>`).join('');
+  } else {
+    existSec.style.display = 'none';
+  }
+
+  // 入力行をリセット（今日の日付で1行）
+  document.getElementById('order-date-rows').innerHTML = '';
+  addOrderDateRow();
+
+  document.getElementById('order-modal').style.display = 'flex';
+}
+
+function openOrderModalForCurrent() {
+  if (!contacts.length) return;
+  const c = contacts[currentIdx % contacts.length];
+  toggleCallSettings();
+  openOrderModal(c.id);
+}
+
+function closeOrderModal(e) {
+  if (!e || e.target === document.getElementById('order-modal'))
+    document.getElementById('order-modal').style.display = 'none';
+}
+
+function addOrderDateRow() {
+  const container = document.getElementById('order-date-rows');
+  const idx = container.children.length;
+  const today = new Date().toISOString().split('T')[0];
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:6px;align-items:center';
+  row.innerHTML = `
+    <input type="date" value="${today}" style="flex:2;font-family:var(--mono)" data-role="order-date">
+    <input type="number" placeholder="金額(円)" min="0" style="flex:1.5;text-align:right" data-role="order-amount">
+    <button onclick="this.parentElement.remove()"
+      style="background:none;border:none;color:var(--danger);font-size:18px;cursor:pointer;padding:4px;flex-shrink:0">×</button>`;
+  container.appendChild(row);
+}
+
+function saveOrderDates() {
+  if (!orderModalContactId) return;
+  const c = contacts.find(c => String(c.id) === String(orderModalContactId));
+  if (!c) return;
+
+  const rowEls = document.getElementById('order-date-rows').querySelectorAll('div');
+  const entries = [...rowEls].map(r => ({
+    date:   (r.querySelector('[data-role=order-date]')   || {}).value || '',
+    amount: parseInt((r.querySelector('[data-role=order-amount]') || {}).value) || 0
+  })).filter(e => e.date);
+  const dates = entries.map(e => e.date);
+
+  if (!dates.length) { alert('日付を入力してください'); return; }
+
+  // 既存注文日と重複チェック
+  const existing = new Set(getOrderDates(orderModalContactId));
+  const newDates  = dates.filter(d => !existing.has(d));
+  const dupCount  = dates.length - newDates.length;
+
+  if (!newDates.length) {
+    alert('入力された日付はすべて登録済みです');
+    return;
+  }
+
+  // ログエントリを作成
+  const newLogs = newDates.map(d => ({
+    id:              'c_' + Date.now() + '_' + Math.floor(Math.random() * 9999),
+    contactId:       c.id,
+    name:            c.name,
+    phone:           c.phone,
+    calledAt:        d + 'T00:00:00.000Z',
+    result:          'ordered',
+    memo:            '過去注文（手動入力）',
+    nextContactDate: null,
+    orderDate:       d
+  }));
+
+  logs = [...logs, ...newLogs].sort((a, b) =>
+    new Date(b.calledAt) - new Date(a.calledAt));
+
+  // lastOrderDate を最新注文日に更新
+  const latestNewDate = newDates.sort().reverse()[0];
+  const currentLast   = normDateStr(c.lastOrderDate);
+  if (!currentLast || latestNewDate > currentLast) {
+    contacts = contacts.map(ct =>
+      String(ct.id) === String(c.id) ? { ...ct, lastOrderDate: latestNewDate } : ct
+    );
+  }
+
+  save(); // キャッシュクリア（_logsIndex含む）→ 最新状態で以降の処理
+  ensureLastOrderDateLogged(); // save後に実行（logsIndexが再構築された状態で）
+  render();
+  closeOrderModal();
+
+  const msg = dupCount > 0
+    ? `✅ ${newDates.length}件を登録しました（${dupCount}件は重複のためスキップ）`
+    : `✅ ${newDates.length}件の注文日を登録しました`;
+  alert(msg);
+}
+
+// ===== IDマイグレーション（数値ID → 文字列IDに移行） =====
+function migrateIds() {
+  const needsMigration = contacts.some(c => !String(c.id).startsWith('c_'));
+  if (!needsMigration) return;
+
+  const idMap = new Map();
+  contacts = contacts.map((c, i) => {
+    if (!String(c.id).startsWith('c_')) {
+      const oldId = String(c.id);
+      const newId = 'c_' + Date.now() + '_' + i + '_' + Math.floor(Math.random() * 9999);
+      idMap.set(oldId, newId);
+      return { ...c, id: newId };
+    }
+    return c;
+  });
+
+  if (idMap.size > 0) {
+    logs = logs.map(l => {
+      const newContactId = idMap.get(String(l.contactId));
+      return newContactId ? { ...l, contactId: newContactId } : l;
+    });
+    save();
+    console.log('ID移行完了: ' + idMap.size + '件');
+  }
+}
+
+// ===== 推奨間隔への自動同期 =====
+// 注文データが3件以上ある顧客の interval をスマート間隔に自動更新
+function syncSmartIntervals() {
+  let changed = false;
+  contacts = contacts.map(c => {
+    if (c.interval && c.interval !== DEFAULT_INTERVAL) return c; // 手動設定済みはスキップ
+    const orderDts = getOrderDates(c.id);
+    if (orderDts.length < 3) return c; // データ不足
+    const smart   = _calcSmartInterval(c.id);
+    const rounded = Math.max(MIN_INTERVAL, Math.min(MAX_INTERVAL, Math.round(smart / 5) * 5));
+    if (rounded === (c.interval || DEFAULT_INTERVAL)) return c;
+    changed = true;
+    return { ...c, interval: rounded };
+  });
+  if (changed) { _smartIntCache.clear(); save(); }
+}
+
+// ===== lastOrderDate をログに自動登録（未連絡誤表示の防止）=====
+function ensureLastOrderDateLogged() {
+  let changed = false;
+  contacts.forEach(c => {
+    const _ld = normDateStr(c.lastOrderDate);
+    if (!_ld) return;
+    const already = logs.some(l =>
+      String(l.contactId) === String(c.id) &&
+      l.result === 'ordered' &&
+      (l.orderDate === _ld ||
+       (l.calledAt || '').startsWith(_ld))
+    );
+    if (already) return;
+    logs.push({
+      id:              'c_' + Date.now() + '_' + Math.floor(Math.random() * 9999),
+      contactId:       c.id,
+      name:            c.name,
+      phone:           c.phone,
+      calledAt:        _ld + 'T00:00:00.000Z',
+      result:          'ordered',
+      memo:            '最終注文日（顧客システム記録）',
+      nextContactDate: null,
+      orderDate:       _ld,
+      orderAmount:     0
+    });
+    changed = true;
+  });
+  if (changed) {
+    logs.sort((a, b) => new Date(b.calledAt) - new Date(a.calledAt));
+    save();
+  }
+}
+
+// ===== 最終注文年齢別テーマ（コール画面の背景色）=====
+const ORDER_AGE_THEMES = [
+  { border:'#00e5a0', glow:'rgba(0,229,160,0.3)',   label:'今年',    color:'#00e5a0' },
+  { border:'#00bcd4', glow:'rgba(0,188,212,0.3)',   label:'1年前',   color:'#00bcd4' },
+  { border:'#4fc3f7', glow:'rgba(79,195,247,0.3)',  label:'2年前',   color:'#4fc3f7' },
+  { border:'#ba68c8', glow:'rgba(186,104,200,0.3)', label:'3年前',   color:'#ba68c8' },
+  { border:'#ffa726', glow:'rgba(255,167,38,0.3)',  label:'4年前',   color:'#ffa726' },
+  { border:'#ef5350', glow:'rgba(239,83,80,0.25)',  label:'5年以上', color:'#ef5350' },
+];
+
+function getOrderAgeIndex(contact) {
+  // ログからの最終注文日
+  const logDates = logs
+    .filter(l => String(l.contactId) === String(contact?.id) && l.result === 'ordered' && l.orderDate)
+    .map(l => l.orderDate).sort().reverse();
+  const logLastOrder = logDates[0] || null;
+
+  // contactのlastOrderDateとログの最新注文日の新しい方を使用
+  let lastOrder = null;
+  if (logLastOrder && contact?.lastOrderDate) {
+    lastOrder = logLastOrder > contact.lastOrderDate ? logLastOrder : contact.lastOrderDate;
+  } else {
+    lastOrder = logLastOrder || contact?.lastOrderDate || null;
+  }
+
+  if (!lastOrder) return 5; // 未注文 = 休眠扱い
+  const orderYear = new Date(lastOrder).getFullYear();
+  const diff = new Date().getFullYear() - orderYear;
+  return Math.min(diff, 5);
+}
+
+function applyContactTheme(contact) {
+  const idx = getOrderAgeIndex(contact);
+  const theme = ORDER_AGE_THEMES[idx];
+  const cc = document.getElementById('call-card');
+  if (cc) {
+    cc.style.border    = '2px solid ' + theme.border;
+    cc.style.boxShadow = '0 0 20px ' + theme.glow + ', inset 0 0 20px ' + theme.glow.replace('0.3','0.05');
+  }
+  const lbl = document.getElementById('order-age-label');
+  if (lbl) {
+    lbl.textContent = theme.label;
+    lbl.style.color      = theme.color;
+    lbl.style.border     = '1px solid ' + theme.border;
+    lbl.style.background = theme.glow.replace('0.3','0.15');
+    lbl.style.display    = '';
+  }
+}
+
+function applyYearTheme() {
+  // 背景は常に暗め固定
+  const r = document.documentElement;
+  r.style.setProperty('--bg',       '#060609');
+  r.style.setProperty('--surface',  '#0e0e14');
+  r.style.setProperty('--surface2', '#141420');
+  r.style.setProperty('--border',   '#1e1e2c');
+}
+
+// ===== 日本の祝日判定 =====
+function isJapaneseHoliday(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d.getTime())) return false;
+  if (_isNamedHoliday(d)) return true;
+  // 振替休日（日曜祝日 → 翌月曜）
+  if (d.getDay() === 1) {
+    const prev = new Date(d); prev.setDate(d.getDate() - 1);
+    if (_isNamedHoliday(prev)) return true;
+  }
+  return false;
+}
+function _isNamedHoliday(d) {
+  const y = d.getFullYear(), m = d.getMonth()+1, day = d.getDate(), dow = d.getDay();
+  const fixed = [[1,1],[2,11],[2,23],[4,29],[5,3],[5,4],[5,5],[8,11],[11,3],[11,23]];
+  if (fixed.some(([fm,fd]) => fm===m && fd===day)) return true;
+  if (dow === 1) {
+    const wn = Math.ceil(day/7);
+    if (m===1 && wn===2) return true; if (m===7 && wn===3) return true;
+    if (m===9 && wn===3) return true; if (m===10 && wn===2) return true;
+  }
+  const sb = Math.floor(20.8431 + 0.242194*(y-1980) - Math.floor((y-1980)/4));
+  if (m===3 && day===sb) return true;
+  const ab = Math.floor(23.2488 + 0.242194*(y-1980) - Math.floor((y-1980)/4));
+  if (m===9 && day===ab) return true;
+  return false;
+}
+
+// ===== 日付フォーマット（祝日・曜日カラー対応） =====
+function formatDateJPFull(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return String(dateStr);
+  const dows = ['日','月','火','水','木','金','土'];
+  const dow = dows[d.getDay()];
+  const dateText = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+  let color = '';
+  if (d.getDay()===0 || isJapaneseHoliday(d)) color = '#ef5350';
+  else if (d.getDay()===6) color = '#42a5f5';
+  const dowSpan = color
+    ? `<span style="color:${color};font-weight:700">（${dow}）</span>`
+    : `（${dow}）`;
+  return `${dateText}${dowSpan}`;
+}
+
+// ===== 未連絡月数計算 =====
+// 月日フォーマット: N月N日
+function formatDateJP(date) {
+  if (!date) return '';
+  const d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d.getTime())) return '';
+  return `${d.getMonth()+1}月${d.getDate()}日`;
+}
+
+function getContactedMonths(contactId) {
+  const days = daysSinceLastCall(contactId);
+  if (days === null) return null;
+  const months = Math.floor(days / 30.44);
+  const remDays = days - Math.floor(months * 30.44);
+  return { months, remDays, totalDays: days };
+}
+
+async function lookupAddress(contactIdx) {
+  const c = contacts[contactIdx];
+  if (!c || !c.postalCode) return;
+  if (c.address) return; // キャッシュ済み
+  try {
+    const clean = c.postalCode.replace(/[^\d]/g, '');
+    if (clean.length !== 7) return;
+    const r = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${clean}`);
+    const data = await r.json();
+    if (data.results && data.results[0]) {
+      const a = data.results[0];
+      contacts[contactIdx].address = a.address1 + a.address2 + a.address3;
+      save();
+      // 表示中の連絡先なら即反映
+      if (contactIdx === currentIdx % contacts.length) {
+        document.getElementById('current-address').textContent = '📍 ' + contacts[contactIdx].address;
+      }
+    }
+  } catch(e) {}
+}
+const GAS_URL_KEY = 'autocall_gas_url';
+const GAS_SEC_KEY = 'autocall_gas_key';
+const GAS_SYNC_KEY = 'autocall_gas_synced';
+
+function getDriveConfig() {
+  return {
+    url: localStorage.getItem(GAS_URL_KEY) || '',
+    key: localStorage.getItem(GAS_SEC_KEY) || ''
+  };
+}
+
+function updateDriveBar() {
+  const { url } = getDriveConfig();
+  const label = document.getElementById('drive-sync-label');
+  const last = localStorage.getItem(GAS_SYNC_KEY);
+  if (!url) {
+    label.textContent = '未設定';
+    label.style.color = 'var(--text3)';
+  } else if (last) {
+    label.textContent = '最終同期: ' + formatDate(last);
+    label.style.color = 'var(--accent)';
+  } else {
+    label.textContent = '設定済み（未同期）';
+    label.style.color = 'var(--text2)';
+  }
+}
+
+function setDriveBtnState(loading) {
+  ['btn-drive-load','btn-drive-save'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.disabled = loading;
+  });
+}
+
+async function saveToDrive() {
+  const { url, key } = getDriveConfig();
+  if (!url || !key) { openDriveSettings(); return; }
+  setDriveBtnState(true);
+  document.getElementById('drive-sync-label').textContent = '保存中…';
+  try {
+    const payload = { contacts, logs, currentIdx, savedAt: new Date().toISOString() };
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'save', key, data: payload }),
+      redirect: 'follow'
+    });
+    const text = await r.text();
+    let json;
+    try { json = JSON.parse(text); } catch(e) { json = { ok: true }; }
+    if (json.error) throw new Error(json.error);
+    localStorage.setItem(GAS_SYNC_KEY, new Date().toISOString());
+    updateDriveBar();
+    flashDriveMsg('✅ Driveに保存しました', 'var(--accent)');
+  } catch(e) {
+    flashDriveMsg('❌ ' + e.message, 'var(--danger)');
+  }
+  setDriveBtnState(false);
+}
+
+async function loadFromDrive() {
+  const { url, key } = getDriveConfig();
+  if (!url || !key) { openDriveSettings(); return; }
+  setDriveBtnState(true);
+  document.getElementById('drive-sync-label').textContent = '読込中…';
+  try {
+    // GETリクエスト: CORSプリフライト不要
+    const r = await fetch(`${url}?action=load&key=${encodeURIComponent(key)}`, {
+      method: 'GET',
+      redirect: 'follow'
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const json = await r.json();
+    if (json.error) throw new Error(json.error);
+    if (!json.data) {
+      flashDriveMsg('☁️ Driveにデータがありません', 'var(--amber)');
+      setDriveBtnState(false); updateDriveBar(); return;
+    }
+    const d = json.data;
+    const ok = confirm(
+      `Driveのデータを読み込みます。\n連絡先: ${d.contacts?.length||0}件 / 履歴: ${d.logs?.length||0}件\n保存日時: ${d.savedAt ? formatDateFull(d.savedAt) : '不明'}\n\n現在のデータを置き換えます。よろしいですか？`
+    );
+    if (!ok) { setDriveBtnState(false); updateDriveBar(); return; }
+    contacts = d.contacts || [];
+    logs = d.logs || [];
+    currentIdx = d.currentIdx || 0;
+    const pending = logs.find(l => l.result === null);
+    pendingLogId = pending ? pending.id : null;
+    save();
+    ensureLastOrderDateLogged();
+    syncSmartIntervals();
+    render();
+    localStorage.setItem(GAS_SYNC_KEY, new Date().toISOString());
+    updateDriveBar();
+    flashDriveMsg('✅ 読み込み完了', 'var(--accent)');
+  } catch(e) {
+    flashDriveMsg('❌ ' + e.message, 'var(--danger)');
+  }
+  setDriveBtnState(false);
+}
+
+function flashDriveMsg(msg, color) {
+  const el = document.getElementById('drive-sync-label');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = color;
+  setTimeout(updateDriveBar, 3000);
+}
+
+function openDriveSettings() {
+  const { url, key } = getDriveConfig();
+  document.getElementById('drive-url-input').value = url;
+  document.getElementById('drive-key-input').value = key;
+  document.getElementById('drive-settings-msg').textContent = '';
+  document.getElementById('drive-modal').style.display = 'flex';
+}
+function closeDriveModal(e) {
+  if (!e || e.target === document.getElementById('drive-modal'))
+    document.getElementById('drive-modal').style.display = 'none';
+}
+async function saveDriveSettings() {
+  const url = document.getElementById('drive-url-input').value.trim();
+  const key = document.getElementById('drive-key-input').value.trim();
+  const msg = document.getElementById('drive-settings-msg');
+  if (!url || !key) { msg.style.color='var(--danger)'; msg.textContent='URLとキーを入力してください'; return; }
+  msg.style.color = 'var(--text2)'; msg.textContent = '接続確認中…';
+  try {
+    const r = await fetch(`${url}?action=ping&key=${encodeURIComponent(key)}`, { redirect: 'follow' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const json = await r.json();
+    if (json.error) throw new Error(json.error);
+    localStorage.setItem(GAS_URL_KEY, url);
+    localStorage.setItem(GAS_SEC_KEY, key);
+    msg.style.color = 'var(--accent)'; msg.textContent = '✅ 接続OK！';
+    updateDriveBar();
+    setTimeout(closeDriveModal, 1200);
+  } catch(e) {
+    msg.style.color = 'var(--danger)'; msg.textContent = '❌ ' + e.message;
+  }
+}
+
+// ===== State =====
+const DEFAULT_INTERVAL = 45;
+const MIN_INTERVAL     = 14;
+const MAX_INTERVAL     = 90;
+const SKIP_THRESHOLD   = 3;
+const GROUP_BOOST_DAYS = 7;
+let contacts = [];
+let logs = [];
+let currentIdx = 0;
+let pendingLogId = null;
+let importData = [];
+let importMode = 'merge';
+let editingLogId = null;
+let editingId = null;
+let navHistory = [];
+
+const RESULTS = {
+  answered:  { label: '通話できた', emoji: '✅', color: '#3dd9a4' },
+  voicemail: { label: '留守電',     emoji: '📼', color: '#f5a623' },
+  no_answer: { label: '不在',       emoji: '❌', color: '#e84545' },
+  ordered:   { label: '注文有り',   emoji: '🛒', color: '#a78bfa' },
+  refused:   { label: 'お断り',     emoji: '🚫', color: '#ff7043' },
+  skipped:   { label: 'スキップ',   emoji: '⏭', color: '#8892aa' },
+};
+
+// ===== Storage =====
+function save() {
+  _amountsCache = null; _sortedAmounts = null; _ranksCache = null;
+  _logsIndex = null; _smartIntCache.clear();
+  try {
+    localStorage.setItem('autocall_contacts', JSON.stringify(contacts));
+    localStorage.setItem('autocall_logs', JSON.stringify(logs));
+    localStorage.setItem('autocall_idx', String(currentIdx));
+  } catch(e) { alert('保存エラー: ' + e.message); }
+}
+
+function load() {
+  let loadMsg = '';
+  try {
+    const c = localStorage.getItem('autocall_contacts');
+    const l = localStorage.getItem('autocall_logs');
+    const i = localStorage.getItem('autocall_idx');
+    if (c) { contacts = JSON.parse(c); }
+    if (l) {
+      logs = JSON.parse(l);
+      const pending = logs.find(lg => lg.result === null);
+      if (pending) pendingLogId = pending.id;
+    }
+    if (i) currentIdx = parseInt(i) || 0;
+    if (currentIdx >= contacts.length && contacts.length > 0) currentIdx = 0;
+    if (contacts.length > 0 || logs.length > 0) {
+      loadMsg = `✅ 連絡先 ${contacts.length}件・履歴 ${logs.length}件 読み込みました`;
+    }
+  } catch(e) {
+    loadMsg = '⚠️ データ読み込みエラー: ' + e.message;
+  }
+  return loadMsg;
+}
+
+// ===== Tab switching =====
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  render();
+}
+
+// ===== Call logic =====
+function logCall(e) {
+  if (!contacts.length || pendingLogId) { e.preventDefault(); return; }
+  flushInfoFields();
+  const idx = currentIdx % contacts.length;
+  const contact = contacts[idx];
+  const entry = {
+    id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 9999),
+    contactId: contact.id,
+    name: contact.name,
+    phone: contact.phone,
+    calledAt: new Date().toISOString(),
+    result: null
+  };
+  logs.unshift(entry);
+  pendingLogId = entry.id;
+  save();
+  setTimeout(() => {
+    render();
+    const m = document.getElementById('call-memo');
+    if (m) m.value = '';
+    const od = document.getElementById('order-date');
+    if (od) od.value = '';
+    const nd = document.getElementById('next-contact-date');
+    if (nd) {
+      const interval = contact.interval || DEFAULT_INTERVAL;
+      const nextDate = new Date();
+      nextDate.setDate(nextDate.getDate() + interval);
+      nd.value = nextDate.toISOString().split('T')[0];
+    }
+  }, 150);
+  // href is already set on the <a> tag via render() — browser handles tel: call
+}
+
+function recordResult(result) {
+  if (!pendingLogId) return;
+  const memo = (document.getElementById('call-memo')?.value || '').trim();
+  const ndInput = document.getElementById('next-contact-date')?.value || '';
+  const orderDateInput = document.getElementById('order-date')?.value || '';
+  const orderDate = result === 'ordered'
+    ? (orderDateInput || new Date().toISOString().split('T')[0])
+    : null;
+  // If blank, auto-calculate from contact's interval
+  let nextContactDate = ndInput || null;
+  if (!nextContactDate) {
+    const log = logs.find(l => l.id === pendingLogId);
+    const contact = log ? contacts.find(c => String(c.id) === String(log.contactId)) : null;
+    const smartInt = contact ? calculateSmartInterval(contact.id) : DEFAULT_INTERVAL;
+    const d = new Date();
+    if (result === 'refused') {
+      // お断り: 連続お断り回数をカウントして間隔を段階的に延長
+      const prevRefused = contact ? (getLogsIndex().get(String(contact.id)) || [])
+        .filter(l => l.result === 'refused').length : 0;
+      const penalty = Math.min(prevRefused + 1, 3) * 30; // 30/60/90日追加（最大90）
+      d.setDate(d.getDate() + Math.min(smartInt + penalty, MAX_INTERVAL));
+    } else if (result === 'no_answer') {
+      // 不在はコール済みだが応答なし → 次回期日をリセットしない
+      nextContactDate = null;
+    } else {
+      d.setDate(d.getDate() + smartInt);
+    }
+    if (result !== 'no_answer') nextContactDate = d.toISOString().split('T')[0];
+  }
+  logs = logs.map(l => l.id === pendingLogId ? { ...l, result, memo, nextContactDate, orderDate } : l);
+  // 注文有りの場合 lastOrderDate を更新
+  if (result === 'ordered' && orderDate) {
+    const log = logs.find(l => l.id === pendingLogId);
+    if (log) {
+      contacts = contacts.map(c => {
+        if (String(c.id) !== String(log.contactId)) return c;
+        const cur = normDateStr(c.lastOrderDate);
+        return (!cur || orderDate > cur) ? { ...c, lastOrderDate: orderDate } : c;
+      });
+    }
+  }
+  // answered/voicemail のみグループブースト適用
+  if (result === 'answered' || result === 'voicemail') {
+    const log = logs.find(l => l.id === pendingLogId);
+    if (log) applyGroupBoost(log.contactId);
+  }
+  pendingLogId = null;
+  navHistory.push(currentIdx);
+  currentIdx = getPriorityNextIdx();
+  save();
+  render();
+}
+
+function skipCurrent() {
+  if (pendingLogId) { recordResult('skipped'); return; }
+  if (!contacts.length) return;
+  flushInfoFields();
+  navHistory.push(currentIdx);
+  currentIdx = getRandomSkipIdx();
+  save();
+  render();
+}
+
+function goBack() {
+  if (!navHistory.length) return;
+  flushInfoFields();
+  currentIdx = navHistory.pop();
+  save();
+  render();
+}
+
+function saveContactInfo(field, value) {
+  if (!contacts.length) return;
+  const idx = currentIdx % contacts.length;
+  contacts[idx].info = contacts[idx].info || {};
+  contacts[idx].info[field] = value;
+  save();
+}
+
+function saveInfoManual() {
+  flushInfoFields();
+  save();
+  const btn = document.getElementById('info-save-btn');
+  if (btn) {
+    const orig = btn.textContent;
+    btn.textContent = '✅ 保存済';
+    btn.style.color = 'var(--accent)';
+    btn.style.borderColor = 'var(--accent)';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; btn.style.borderColor = ''; }, 1500);
+  }
+}
+
+// ナビゲーション前に入力中の情報を確実に保存
+function flushInfoFields() {
+  if (!contacts.length) return;
+  const idx = currentIdx % contacts.length;
+  contacts[idx].info = {
+    likes:    document.getElementById('info-likes')?.value    || '',
+    delivery: document.getElementById('info-delivery')?.value || '',
+    payment:  document.getElementById('info-payment')?.value  || '',
+    notes:    document.getElementById('info-notes')?.value    || '',
+  };
+}
+
+// スキップ時: 未連絡・期限超過からランダム（なければ全体からランダム）、現在は除外
+function getRandomSkipIdx() {
+  if (contacts.length <= 1) return 0;
+  const now = Date.now();
+  // 実際の期日（スコア前倒しなし）で超過・未連絡を判定
+  const priority = contacts
+    .map((c, i) => {
+      const dueDate = getNextDueDate(c.id);
+      const dueTime = (!dueDate || isNaN(dueDate.getTime())) ? 0 : dueDate.getTime();
+      return { i, dueTime };
+    })
+    .filter(x => x.i !== currentIdx && (x.dueTime === 0 || x.dueTime <= now));
+  if (priority.length > 0) {
+    return priority[Math.floor(Math.random() * priority.length)].i;
+  }
+  // 全員期限内の場合: 現在以外からランダム
+  const others = contacts.map((_, i) => i).filter(i => i !== currentIdx);
+  return others[Math.floor(Math.random() * others.length)];
+}
+
+// ===== Priority logic =====
+function getContactInterval(contactId) {
+  const c = contacts.find(c => String(c.id) === String(contactId));
+  return (c && c.interval) ? c.interval : DEFAULT_INTERVAL;
+}
+
+function daysBetween(d1, d2) {
+  return Math.round((new Date(d2) - new Date(d1)) / 86400000);
+}
+
+// 注文日リスト（ordered ログから抽出）
+function getOrderDates(contactId) {
+  const all = getLogsIndex().get(String(contactId)) || [];
+  const dates = all
+    .filter(l => l.result === 'ordered')
+    .map(l => l.orderDate || l.calledAt.split('T')[0])
+    .sort();
+  return [...new Set(dates)];
+}
+
+// 季節補正係数
+function getSeasonalFactor(orderDates, targetMonth) {
+  if (orderDates.length < 6) return 1;
+  const counts = new Array(12).fill(0);
+  orderDates.forEach(d => counts[new Date(d).getMonth()]++);
+  const avg = orderDates.length / 12;
+  return avg > 0 ? counts[targetMonth] / avg : 1;
+}
+
+// スマート連絡間隔算出
+function calculateSmartInterval(contactId) {
+  const _cacheKey = String(contactId);
+  if (_smartIntCache.has(_cacheKey)) return _smartIntCache.get(_cacheKey);
+  const _raw = _calcSmartInterval(contactId);
+  const _result = (!isNaN(_raw) && _raw > 0) ? _raw : DEFAULT_INTERVAL;
+  _smartIntCache.set(_cacheKey, _result);
+  return _result;
+}
+function _calcSmartInterval(contactId) {
+  const orderDates = getOrderDates(contactId);
+  const n = orderDates.length;
+  const manual = getContactInterval(contactId);
+  if (n < 2) return manual;
+
+  // 連続注文間隔リスト
+  const gaps = [];
+  for (let i = 1; i < n; i++) gaps.push(daysBetween(orderDates[i-1], orderDates[i]));
+
+  // 直近重み付け平均（直近ほど高ウェイト）
+  const recent = gaps.slice(-6);
+  let wSum = 0, wTotal = 0;
+  recent.forEach((g, i) => { const w = i + 1; wSum += g * w; wTotal += w; });
+  const weightedAvg = wSum / wTotal;
+
+  // 安定性スコア（変動係数）
+  const mean = gaps.reduce((a,b) => a+b,0) / gaps.length;
+  const stdDev = Math.sqrt(gaps.reduce((a,g) => a+(g-mean)**2, 0) / gaps.length);
+  const cv = mean > 0 ? stdDev / mean : 0;
+  const stabilityAdj = cv > 0.3 ? 0.85 : cv > 0.15 ? 0.92 : 1.0;
+
+  // 先行接触補正（注文前に連絡できるよう15%前倒し）
+  const anticipation = Math.max(7, weightedAvg * 0.15);
+  let target = (weightedAvg - anticipation) * stabilityAdj;
+
+  // 信頼度ブレンド（注文回数が少ないうちはデフォルト寄り）
+  const confidence = Math.min(1, (n - 1) / 4);
+  target = manual * (1 - confidence) + target * confidence;
+
+  // 季節補正
+  const nextContactDate = new Date();
+  nextContactDate.setDate(nextContactDate.getDate() + Math.round(target));
+  const seasonFactor = getSeasonalFactor(orderDates, nextContactDate.getMonth());
+  if (seasonFactor > 1.3) target *= 0.85;
+
+  // 休眠補正（最終注文から想定間隔の1.8倍超 → 早めに再アプローチ）
+  const daysSinceLast = daysBetween(orderDates[n-1], new Date().toISOString().split('T')[0]);
+  if (daysSinceLast > target * 1.8) target = Math.max(MIN_INTERVAL, target * 0.7);
+
+  // ティアによるインターバル補正（A=短め/D=長め）
+  const tierMult = getCustomerTier(contactId).intervalMult;
+  return Math.max(MIN_INTERVAL, Math.min(MAX_INTERVAL, Math.round(target * tierMult)));
+}
+
+// 優先スコア（高いほど早急に連絡が必要）
+// ===== 優先度スコア（消化率 × 年次係数 × 購入係数）=====
+// 年次係数: 今年1.4 / 前年1.2 / 2年前0.8 / 3年以上0.5
+const ORDER_AGE_COEFF = [1.4, 1.2, 0.8, 0.5, 0.5, 0.5];
+
+// ===== ログインデックス（contactId → ログ配列）キャッシュ =====
+let _logsIndex     = null;
+let _smartIntCache = new Map();
+
+function getLogsIndex() {
+  if (_logsIndex) return _logsIndex;
+  _logsIndex = new Map();
+  logs.forEach(l => {
+    if (!l.contactId) return;
+    const key = String(l.contactId);
+    if (!_logsIndex.has(key)) _logsIndex.set(key, []);
+    _logsIndex.get(key).push(l);
+  });
+  _logsIndex.forEach(v => v.sort((a, b) => new Date(b.calledAt) - new Date(a.calledAt)));
+  return _logsIndex;
+}
+
+// ===== 顧客ランク自動分類（A/B/C/D）=====
+const CUSTOMER_TIERS = {
+  A: { key:'A', label:'超重要', desc:'年間100万+',   color:'#ffd700', bg:'rgba(255,215,0,0.15)',   emoji:'👑', scoreBoost:1.5, intervalMult:0.7 },
+  B: { key:'B', label:'中核',   desc:'年間10〜100万', color:'#00e5a0', bg:'rgba(0,229,160,0.12)',   emoji:'⭐', scoreBoost:1.2, intervalMult:1.0 },
+  C: { key:'C', label:'小口',   desc:'年間1〜10万',  color:'#4fc3f7', bg:'rgba(79,195,247,0.12)',  emoji:'🔵', scoreBoost:1.0, intervalMult:1.2 },
+  D: { key:'D', label:'休眠',   desc:'年間2万未満',  color:'#78909c', bg:'rgba(120,144,156,0.1)',  emoji:'💤', scoreBoost:0.5, intervalMult:1.5 },
+};
+
+function getCustomerTier(contactId) {
+  // 年間注文回数（金額に関わらず直近1年の注文があれば休眠にしない）
+  const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear() - 1);
+  const idx = getLogsIndex().get(String(contactId)) || [];
+  const cnt = idx.filter(l => l.result === 'ordered' && new Date(l.calledAt) >= cutoff).length;
+
+  // 金額データがある場合はA/B/Cの判定に使う
+  const annual = getAnnualAmount(contactId);
+  if (annual >= 1000000 || cnt >= 8) return CUSTOMER_TIERS.A;
+  if (annual >= 100000  || cnt >= 3) return CUSTOMER_TIERS.B;
+  if (annual >= 10000   || cnt >= 1) return CUSTOMER_TIERS.C;
+
+  // lastOrderDate フォールバック（ログが見つからない場合の安全策）
+  const c = contacts.find(c => String(c.id) === String(contactId));
+  const ld = normDateStr(c?.lastOrderDate);
+  if (ld && new Date(ld) >= cutoff) return CUSTOMER_TIERS.C;
+
+  // 直近1年注文なし＆金額データなし → 休眠
+  return CUSTOMER_TIERS.D;
+}
+
+// ===== 異変検知 =====
+function detectAnomaly(contactId) {
+  const orderDates = getOrderDates(contactId);
+  if (orderDates.length < 2) return null;
+  const smartInt  = calculateSmartInterval(contactId);
+  const daysSince = daysSinceLastCall(contactId);
+  if (daysSince === null) return null;
+
+  // 通常の1.5倍を超えたら「動きが鈍い」
+  const ratio = daysSince / Math.max(1, smartInt);
+  if (ratio >= 2.0) return { level: 'critical', msg: `🚨 通常の${ratio.toFixed(1)}倍 経過` };
+  if (ratio >= 1.5) return { level: 'warn',     msg: `⚠️ ${Math.round(daysSince - smartInt)}日 遅れ` };
+
+  // 繁忙期なのに未注文チェック
+  const c = contacts.find(c => String(c.id) === String(contactId));
+  if (c?.peakMonths?.length) {
+    const m = new Date().getMonth() + 1;
+    if (c.peakMonths.includes(m) && daysSince > 30) {
+      return { level: 'warn', msg: '🌸 繁忙期に未注文' };
+    }
+  }
+  return null;
+}
+
+// ===== 連絡手段推奨 =====
+function getContactMethodHint(contactId) {
+  const tier = getCustomerTier(contactId);
+  if (tier.key === 'D') return { method: '一斉配信', icon: '📧', note: '電話より一斉配信を推奨' };
+  if (tier.key === 'C') return { method: 'LINE/電話', icon: '📱', note: '状況次第でLINEも可' };
+  return { method: '電話', icon: '📞', note: null };
+}
+
+// 購入係数（注文回数で代用。将来的に金額データで上書き可）
+// 年間金額マップ（キャッシュ付き・O(m)で全件計算）
+let _amountsCache = null, _amountsCacheAt = 0;
+function getAmountsMap() {
+  if (_amountsCache && Date.now() - _amountsCacheAt < 10000) return _amountsCache;
+  _amountsCache = new Map();
+  const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear() - 1);
+  logs.forEach(l => {
+    if (l.result === 'ordered' && l.orderAmount > 0 && new Date(l.calledAt) >= cutoff) {
+      const cid = String(l.contactId);
+      _amountsCache.set(cid, (_amountsCache.get(cid) || 0) + (l.orderAmount || 0));
+    }
+  });
+  _amountsCacheAt = Date.now();
+  return _amountsCache;
+}
+
+function getAnnualAmount(contactId) {
+  return getAmountsMap().get(String(contactId)) || 0;
+}
+
+// 金額ソート済みリスト（キャッシュ付き）
+let _sortedAmounts = null, _sortedAt = 0;
+function getSortedAmounts() {
+  if (_sortedAmounts && Date.now() - _sortedAt < 10000) return _sortedAmounts;
+  const m = getAmountsMap();
+  _sortedAmounts = [...m.values()].sort((a, b) => b - a);
+  _sortedAt = Date.now();
+  return _sortedAmounts;
+}
+
+function getPurchaseCoeff(contactId) {
+  const annual = getAnnualAmount(contactId);
+  if (annual > 0) {
+    const sorted = getSortedAmounts();
+    if (sorted.length > 0) {
+      const rank = sorted.indexOf(annual) + 1;
+      const pct  = rank / sorted.length;
+      if (pct <= 0.20) return 1.3;
+      if (pct <= 0.40) return 1.2;
+      if (pct <= 0.80) return 1.0;
+      return 0.8;
+    }
+  }
+  const n = getOrderDates(contactId).length;
+  if (n >= 6) return 1.3;
+  if (n >= 3) return 1.2;
+  if (n >= 1) return 1.0;
+  return 0.8;
+}
+
+// 総合優先スコア
+function calculatePriorityScore(contactId) {
+  const c = contacts.find(c => String(c.id) === String(contactId));
+  const smartInt  = Math.max(1, calculateSmartInterval(contactId));
+  const daysSince = daysSinceLastCall(contactId);
+
+  // 消化率
+  const utilization = daysSince === null ? 2.0 : daysSince / smartInt;
+
+  // 年次係数
+  const ageIdx   = Math.min(getOrderAgeIndex(c), 5);
+  const ageCoeff = ORDER_AGE_COEFF[ageIdx];
+
+  // 購入係数
+  const purchaseCoeff = getPurchaseCoeff(contactId);
+
+  // スキップブースト
+  const skipCount = getSkipCount(contactId);
+  const skipBoost = skipCount >= SKIP_THRESHOLD ? 1 + (skipCount - SKIP_THRESHOLD) * 0.1 : 1.0;
+
+  // グループブースト
+  let groupBoost = 1.0;
+  if (c?.groupBoostedAt) {
+    const age = Date.now() - new Date(c.groupBoostedAt).getTime();
+    if (age < GROUP_BOOST_DAYS * 86400000) groupBoost = 1.3;
+  }
+
+  // 季節ブースト（繁忙月の45日前から優先度UP）
+  let seasonBoost = 1.0;
+  if (c?.peakMonths?.length) {
+    const now = new Date();
+    const daysToNextPeak = c.peakMonths.reduce((min, m) => {
+      let d = new Date(now.getFullYear(), m - 1, 1);
+      if (d < now) d = new Date(now.getFullYear() + 1, m - 1, 1);
+      const diff = Math.ceil((d - now) / 86400000);
+      return Math.min(min, diff);
+    }, 999);
+    if (daysToNextPeak <= 45) seasonBoost = 1.0 + (1 - daysToNextPeak / 45) * 0.4; // 最大1.4倍
+  }
+
+  return utilization * ageCoeff * purchaseCoeff * skipBoost * groupBoost * seasonBoost;
+}
+
+// 後方互換
+function getContactScore(contactId) { return calculatePriorityScore(contactId); }
+
+// 全連絡先のスコアランクを計算
+// ランクマップ（キャッシュ付き・render()で2回呼ばれるため）
+let _ranksCache = null, _ranksCacheAt = 0;
+function calcAllRanks() {
+  if (_ranksCache) return _ranksCache;
+  if (_ranksCache && Date.now() - _ranksCacheAt < 5000) return _ranksCache;
+  const sorted = [...contacts]
+    .map(c => ({ id: c.id, score: calculatePriorityScore(c.id) }))
+    .sort((a, b) => b.score - a.score);
+  _ranksCache = new Map();
+  sorted.forEach((c, i) => _ranksCache.set(String(c.id), i + 1));
+  _ranksCacheAt = Date.now();
+  return _ranksCache;
+}
+
+function getPriorityGroup(rank, total) {
+  const top   = Math.min(30, Math.ceil(total * 0.15));
+  const mid   = top + Math.min(50, Math.ceil(total * 0.25));
+  if (rank <= top) return { label:'超優先', emoji:'🔥', color:'#ef5350', bg:'rgba(239,83,80,0.15)' };
+  if (rank <= mid) return { label:'通常',   emoji:'📞', color:'#ffa726', bg:'rgba(255,167,38,0.12)' };
+  return               { label:'掘り起こし', emoji:'📭', color:'#78909c', bg:'rgba(120,144,156,0.1)' };
+}
+
+// 「連絡済み」= answered / voicemail / ordered（不在・スキップは含まない）
+// 最新順にソートして返す（cl[0] が常に最新）
+function getContactedLogs(contactId) {
+  const all = getLogsIndex().get(String(contactId)) || [];
+  return all
+    .filter(l => l.result === 'answered' || l.result === 'voicemail' || l.result === 'ordered' || l.result === 'refused')
+    .sort((a, b) => {
+      // ordered ログは orderDate、それ以外は calledAt で比較
+      const da = (a.result === 'ordered' && a.orderDate) ? a.orderDate : (a.calledAt || '').split('T')[0];
+      const db = (b.result === 'ordered' && b.orderDate) ? b.orderDate : (b.calledAt || '').split('T')[0];
+      return db.localeCompare(da); // 降順（新しい順）
+    });
+}
+
+// 日付文字列を YYYY-MM-DD に正規化
+function normDateStr(s) {
+  if (!s) return null;
+  // Date オブジェクトの場合
+  if (s instanceof Date) {
+    if (isNaN(s.getTime())) return null;
+    return s.toISOString().split('T')[0];
+  }
+  const str = String(s).trim();
+  // YYYY-MM-DD / YYYY/MM/DD
+  const clean = str.replace(/\//g, '-').split('T')[0];
+  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
+  // GASのDate文字列 "Sat May 18 2026..." → パース
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  return null;
+}
+
+// 次回連絡予定日（スマート間隔を使用）
+// ログ + lastOrderDate の新しい方を基準にする
+function getNextDueDate(contactId) {
+  const cl = getContactedLogs(contactId);
+  const c  = contacts.find(c => String(c.id) === String(contactId));
+
+  // ログの最新接触日
+  // ordered ログは orderDate を優先（通話日≠注文日のケース対応）
+  const logDate  = cl.length > 0
+    ? ((cl[0].result === 'ordered' && cl[0].orderDate)
+        ? cl[0].orderDate + 'T00:00:00.000Z'
+        : cl[0].calledAt)
+    : null;
+  // 顧客システムの最終注文日（ISO文字列に揃える）
+  const _nd = normDateStr(c?.lastOrderDate);
+  const sysDate  = _nd ? _nd + 'T00:00:00.000Z' : null;
+
+  // 新しい方を採用
+  let baseDate = null;
+  let fromLog  = false;
+  if (logDate && sysDate) {
+    if (logDate >= sysDate) { baseDate = logDate; fromLog = true; }
+    else                    { baseDate = sysDate; fromLog = false; }
+  } else if (logDate) { baseDate = logDate; fromLog = true; }
+  else if (sysDate)   { baseDate = sysDate; fromLog = false; }
+
+  if (!baseDate) return null; // 本当に未連絡
+
+  const smartInt = calculateSmartInterval(contactId);
+
+  // ログ由来なら nextContactDate を優先
+  if (fromLog && cl[0].nextContactDate) {
+    const nd = new Date(cl[0].nextContactDate);
+    if (!isNaN(nd.getTime())) return nd;
+  }
+
+  const d = new Date(baseDate);
+  if (isNaN(d.getTime())) return null;
+  d.setDate(d.getDate() + smartInt);
+  if (isNaN(d.getTime())) return null;
+  return d;
+}
+
+// 最終連絡からの日数（ログ + lastOrderDate の新しい方）
+function daysSinceLastCall(contactId) {
+  const cl = getContactedLogs(contactId);
+  const c  = contacts.find(c => String(c.id) === String(contactId));
+
+  const logDate = cl.length > 0 ? cl[0].calledAt : null;
+  const _nd2 = normDateStr(c?.lastOrderDate);
+  const sysDate = _nd2 ? _nd2 + 'T00:00:00.000Z' : null;
+
+  let baseDate = null;
+  if (logDate && sysDate) baseDate = logDate >= sysDate ? logDate : sysDate;
+  else baseDate = logDate || sysDate;
+
+  if (!baseDate) return null;
+  const ms = Date.now() - new Date(baseDate).getTime();
+  if (isNaN(ms)) return null;
+  return Math.floor(ms / 86400000);
+}
+
+function getSkipCount(contactId) {
+  const all = getLogsIndex().get(String(contactId)) || [];
+  return all.filter(l => l.result === 'skipped').length;
+}
+
+// 実効優先度
+// 優先度ロジックは下部に定義
+
+// 実効優先度（小さいほど優先）
+function getEffectiveDueTime(contactId) {
+  // getNextDueDate を基準にスコアで微調整
+  const dueDate = getNextDueDate(contactId);
+  if (!dueDate || isNaN(dueDate.getTime())) {
+    // 未連絡（lastOrderDate も無し）= 最高優先
+    return 0;
+  }
+  const score   = calculatePriorityScore(contactId);
+  const baseTime = dueDate.getTime();
+  // スコアが高い（超過・頻繁顧客）ほど前倒し
+  const boost = Math.max(0, score - 1.0) * 15 * 86400000;
+  return baseTime - boost;
+}
+
+// グループブースト適用（answered/voicemail 後に同グループ全員を優先UP）
+function applyGroupBoost(contactId) {
+  const c = contacts.find(c => String(c.id) === String(contactId));
+  if (!c?.group) return;
+  const now = new Date().toISOString();
+  let changed = false;
+  contacts = contacts.map(other => {
+    if (other.group === c.group && other.id !== contactId) {
+      changed = true;
+      return { ...other, groupBoostedAt: now };
+    }
+    return other;
+  });
+  if (changed) save();
+}
+
+function getNextDueTime(contactId) {
+  return getEffectiveDueTime(contactId);
+}
+
+function getPriorityNextIdx() {
+  if (!contacts.length) return 0;
+  let best = 0, bestTime = getEffectiveDueTime(contacts[0].id);
+  for (let i = 1; i < contacts.length; i++) {
+    const t = getEffectiveDueTime(contacts[i].id);
+    if (t < bestTime) { bestTime = t; best = i; }
+  }
+  return best;
+}
+
+// ===== Contacts =====
+function addContact() {
+  const name = document.getElementById('add-name').value.trim();
+  const phone = document.getElementById('add-phone').value.trim();
+  if (!name || !phone) { alert('名前と電話番号を入力してください'); return; }
+  contacts.push({ id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 9999), name, phone });
+  document.getElementById('add-name').value = '';
+  document.getElementById('add-phone').value = '';
+  save();
+  render();
+}
+
+function removeContact(id) {
+  if (!confirm('この連絡先を削除しますか？')) return;
+  contacts = contacts.filter(c => c.id !== id);
+  if (currentIdx >= contacts.length && contacts.length > 0) currentIdx = contacts.length - 1;
+  save();
+  render();
+}
+
+function toggleCallSettings() {
+  if (!contacts.length) return;
+  const panel = document.getElementById('call-card-settings');
+  const open = panel.style.display === 'none';
+  panel.style.display = open ? '' : 'none';
+  if (open) {
+    const c = contacts[currentIdx % contacts.length];
+    document.getElementById('cs-name').value       = c.name  || '';
+    document.getElementById('cs-phone').value      = c.phone || '';
+    document.getElementById('cs-interval').value   = c.interval || DEFAULT_INTERVAL;
+    document.getElementById('cs-group').value      = c.group || '';
+    document.getElementById('cs-peakmonths').value = (c.peakMonths || []).join(',');
+    document.getElementById('cs-nexttalk').value   = c.nextTalk || '';
+  }
+}
+
+function saveCallSettings() {
+  if (!contacts.length) return;
+  const idx      = currentIdx % contacts.length;
+  const name     = document.getElementById('cs-name').value.trim();
+  const phone    = document.getElementById('cs-phone').value.trim();
+  const interval = parseInt(document.getElementById('cs-interval').value);
+  const group      = (document.getElementById('cs-group').value || '').trim() || null;
+  const peakRaw    = (document.getElementById('cs-peakmonths').value || '').trim();
+  const peakMonths = peakRaw ? peakRaw.split(',').map(m => parseInt(m.trim())).filter(m => m >= 1 && m <= 12) : [];
+  const nextTalk   = (document.getElementById('cs-nexttalk').value || '').trim() || null;
+  if (!name || !phone) { alert('名前と電話番号を入力してください'); return; }
+  contacts[idx] = { ...contacts[idx], name, phone, group, peakMonths, nextTalk,
+    interval: (!isNaN(interval) && interval > 0) ? interval : DEFAULT_INTERVAL };
+  save();
+  document.getElementById('call-card-settings').style.display = 'none';
+  render();
+}
+
+function startEdit(id) {
+  editingId = id;
+  render();
+}
+function cancelEdit() {
+  editingId = null;
+  render();
+}
+
+// 連絡先からコール画面へジャンプ
+function jumpToContact(contactId) {
+  const idx = contacts.findIndex(c => String(c.id) === String(contactId));
+  if (idx < 0) return;
+  currentIdx = idx;
+  save();
+  switchTab('call');
+}
+
+function handleContactTap(event, contactId) {
+  // ボタン・入力欄のタップは無視（各ボタンの動作を妨げない）
+  if (event.target.closest('button') || event.target.closest('input')) return;
+  jumpToContact(contactId);
+}
+
+// ===== Log editing =====
+function startLogEdit(id) { editingLogId = id; render(); }
+function cancelLogEdit() { editingLogId = null; render(); }
+function saveLogEdit(id) {
+  const memo = (document.getElementById('log-edit-memo-' + id)?.value || '').trim();
+  const nextContactDate = document.getElementById('log-edit-date-' + id)?.value || null;
+  logs = logs.map(l => l.id === id ? { ...l, memo, nextContactDate: nextContactDate || null } : l);
+  editingLogId = null;
+  save();
+  render();
+}
+function saveEdit(id) {
+  const name = document.getElementById('edit-name-' + id).value.trim();
+  const phone = document.getElementById('edit-phone-' + id).value.trim();
+  if (!name || !phone) return;
+  const intervalVal = parseInt(document.getElementById('edit-interval-' + id)?.value);
+  const interval = (!isNaN(intervalVal) && intervalVal > 0) ? intervalVal : null;
+  const group = (document.getElementById('edit-group-' + id)?.value || '').trim() || null;
+  contacts = contacts.map(c => c.id === id ? { ...c, name, phone, interval, group } : c);
+  editingId = null;
+  save();
+  render();
+}
+
+// ===== Logs =====
+function clearLogs() {
+  if (!confirm('通話履歴をすべて削除しますか？')) return;
+  logs = [];
+  pendingLogId = null;
+  save();
+  render();
+}
+
+// ===== Export =====
+function exportAllData() {
+  const data = { version: 1, contacts, logs, currentIdx, exportedAt: new Date().toISOString() };
+  downloadFile('autocall_backup_' + dateStr() + '.json', JSON.stringify(data, null, 2), 'application/json');
+}
+
+function importAllData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!data.contacts || !data.logs) { alert('形式が正しくありません'); return; }
+      const mode = confirm(
+        `バックアップを読み込みます。\n` +
+        `連絡先: ${data.contacts.length}件 / 履歴: ${data.logs.length}件\n\n` +
+        `【OK】現在のデータに追記\n【キャンセル】現在のデータを置き換え`
+      );
+      if (mode) {
+        // 追記: 既存にないIDのみ追加
+        const existContactIds = new Set(contacts.map(c => c.id));
+        const existLogIds = new Set(logs.map(l => l.id));
+        contacts = [...contacts, ...data.contacts.filter(c => !existContactIds.has(c.id))];
+        logs = [...logs, ...data.logs.filter(l => !existLogIds.has(l.id))];
+        logs.sort((a, b) => new Date(b.calledAt) - new Date(a.calledAt));
+      } else {
+        if (!confirm('現在のデータをすべて置き換えます。よろしいですか？')) return;
+        contacts = data.contacts;
+        logs = data.logs;
+        currentIdx = data.currentIdx || 0;
+      }
+      const pending = logs.find(l => l.result === null);
+      pendingLogId = pending ? pending.id : null;
+      save();
+      render();
+      alert(`読み込み完了：連絡先 ${contacts.length}件 / 履歴 ${logs.length}件`);
+    } catch(err) { alert('読み込みエラー: ' + err.message); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+function exportContacts() {
+  if (!contacts.length) { alert('連絡先がありません'); return; }
+  let csv = '名前,電話番号,連絡間隔(日)\n' + contacts.map(c =>
+    `"${c.name}","${c.phone}","${c.interval || DEFAULT_INTERVAL}"`
+  ).join('\n');
+  downloadFile('contacts_' + dateStr() + '.csv', csv, 'text/csv;charset=utf-8;');
+}
+
+function exportLogs() {
+  if (!logs.length) { alert('履歴がありません'); return; }
+  let csv = '日時,名前,電話番号,結果,メモ,次回連絡日\n' + logs.map(l => {
+    const r = l.result ? RESULTS[l.result]?.label || l.result : '記録待ち';
+    return `"${formatDateFull(l.calledAt)}","${l.name}","${l.phone}","${r}","${(l.memo||'').replace(/"/g,'""')}","${l.nextContactDate||''}"`;
+  }).join('\n');
+  downloadFile('call_logs_' + dateStr() + '.csv', csv, 'text/csv;charset=utf-8;');
+}
+
+function downloadFile(name, content, type) {
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function dateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
+}
+function pad(n) { return String(n).padStart(2, '0'); }
+function formatDate(iso) {
+  if (!iso) return '---';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '---';
+  return `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function formatDateFull(iso) {
+  if (!iso) return '---';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso).split('T')[0] || '---';
+  return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+// ===== Import =====
+function openImportModal() {
+  document.getElementById('import-modal').style.display = 'flex';
+  importData = [];
+  document.getElementById('import-preview').style.display = 'none';
+  document.getElementById('csv-file-input').value = '';
+  document.getElementById('paste-input').value = '';
+  switchImportTab('file');
+}
+function closeImportModal(e) {
+  if (!e || e.target === document.getElementById('import-modal'))
+    document.getElementById('import-modal').style.display = 'none';
+}
+function switchImportTab(name) {
+  document.getElementById('import-file-panel').style.display = name === 'file' ? '' : 'none';
+  document.getElementById('import-paste-panel').style.display = name === 'paste' ? '' : 'none';
+  document.getElementById('itab-file').classList.toggle('active', name === 'file');
+  document.getElementById('itab-paste').classList.toggle('active', name === 'paste');
+}
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => parseImportText(ev.target.result);
+  reader.readAsText(file, 'UTF-8');
+}
+function parsePasteInput() {
+  parseImportText(document.getElementById('paste-input').value);
+}
+function parseImportText(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+  importData = [];
+  for (const line of lines) {
+    const parts = line.split(/,|\t/);
+    if (parts.length >= 2) {
+      const nameRaw = parts[0].replace(/^["']|["']$/g, '').trim();
+      const phoneRaw = parts[1].replace(/^["']|["']$/g, '').trim();
+      // Determine which is name and which is phone
+      const isPhone = s => /^[\d\-+() ]+$/.test(s.replace(/[^\d\-+() ]/g,''));
+      if (isPhone(phoneRaw)) importData.push({ name: nameRaw, phone: phoneRaw });
+      else if (isPhone(nameRaw)) importData.push({ name: phoneRaw || nameRaw, phone: nameRaw });
+      else importData.push({ name: nameRaw, phone: phoneRaw });
+    } else if (parts.length === 1) {
+      const p = parts[0].replace(/^["']|["']$/g, '').trim();
+      if (p) importData.push({ name: p, phone: p });
+    }
+  }
+  showImportPreview();
+}
+function showImportPreview() {
+  if (!importData.length) { alert('解析できるデータが見つかりませんでした'); return; }
+  document.getElementById('preview-count').textContent = importData.length;
+  const list = document.getElementById('preview-list');
+  list.innerHTML = importData.slice(0, 50).map((d, i) =>
+    `<div class="preview-item"><span style="color:var(--text2);font-family:var(--mono);width:24px;flex-shrink:0">${i+1}</span><span style="flex:1">${escHtml(d.name)}</span><span class="preview-phone">${escHtml(d.phone)}</span></div>`
+  ).join('') + (importData.length > 50 ? `<div style="color:var(--text2);font-size:12px;padding:8px 0">…他 ${importData.length - 50} 件</div>` : '');
+  document.getElementById('import-preview').style.display = '';
+}
+function setImportMode(mode) {
+  importMode = mode;
+  document.getElementById('mode-append').classList.toggle('active',  mode === 'append');
+  document.getElementById('mode-merge').classList.toggle('active',   mode === 'merge');
+  document.getElementById('mode-replace').classList.toggle('active', mode === 'replace');
+  const desc = { 
+    append:  '既存にない連絡先のみ追加します',
+    merge:   '名前 or 電話番号が一致する場合は上書き。一致しない場合は追加します',
+    replace: '既存の連絡先をすべて削除して新しいデータに置き換えます'
+  };
+  document.getElementById('mode-desc').textContent = desc[mode];
+}
+function executeImport() {
+  if (!importData.length) return;
+  const newContacts = importData.map(d => ({ id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 9999), name: d.name, phone: d.phone }));
+
+  if (importMode === 'replace') {
+    if (!confirm(`既存の ${contacts.length} 件を削除して ${newContacts.length} 件をインポートします。よろしいですか？`)) return;
+    contacts = newContacts;
+    currentIdx = 0;
+
+  } else if (importMode === 'merge') {
+    let added = 0, updated = 0;
+    for (const nc of newContacts) {
+      const existIdx = contacts.findIndex(c =>
+        c.name === nc.name || c.phone.replace(/[^\d]/g,'') === nc.phone.replace(/[^\d]/g,'')
+      );
+      if (existIdx >= 0) {
+        // 既存を上書き（id・infoは保持）
+        contacts[existIdx] = { ...contacts[existIdx], name: nc.name, phone: nc.phone };
+        updated++;
+      } else {
+        contacts.push(nc);
+        added++;
+      }
+    }
+    save(); render(); closeImportModal();
+    alert(`更新: ${updated}件 / 新規追加: ${added}件`);
+    switchTab('contacts');
+    return;
+
+  } else {
+    // append: 名前・電話番号どちらも一致しないものだけ追加
+    const normalize = p => p.replace(/[^\d]/g, '');
+    const filtered = newContacts.filter(nc =>
+      !contacts.some(c => c.name === nc.name || normalize(c.phone) === normalize(nc.phone))
+    );
+    contacts = [...contacts, ...filtered];
+    save(); render(); closeImportModal();
+    alert(`${filtered.length} 件を追加しました（重複 ${newContacts.length - filtered.length} 件はスキップ）`);
+    switchTab('contacts');
+    return;
+  }
+
+  save(); render(); closeImportModal();
+  alert(`${newContacts.length} 件をインポートしました`);
+  switchTab('contacts');
+}
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ===== Render =====
+function render() {
+  const total = contacts.length;
+  const idx = total > 0 ? currentIdx % total : 0;
+  const current = total > 0 ? contacts[idx] : null;
+  const pending = pendingLogId ? logs.find(l => l.id === pendingLogId) : null;
+  const answered = logs.filter(l => l.result === 'answered').length;
+  const voicemail = logs.filter(l => l.result === 'voicemail').length;
+  const noAnswer = logs.filter(l => l.result === 'no_answer').length;
+  const doneCount = logs.filter(l => l.result !== null).length;
+
+  // Header stats
+  // ヘッダーカウンターは当日分（00:00〜23:59）のみ
+  const _todayStart = new Date(); _todayStart.setHours(0,0,0,0);
+  const _todayLogs  = logs.filter(l => l.calledAt && new Date(l.calledAt) >= _todayStart);
+  document.getElementById('hdr-answered').textContent  = _todayLogs.filter(l => l.result === 'answered').length;
+  document.getElementById('hdr-ordered').textContent   = _todayLogs.filter(l => l.result === 'ordered').length;
+  document.getElementById('hdr-voicemail').textContent = _todayLogs.filter(l => l.result === 'voicemail').length;
+  document.getElementById('hdr-noanswer').textContent  = _todayLogs.filter(l => l.result === 'no_answer').length;
+  const refusedEl = document.getElementById('hdr-refused');
+  if (refusedEl) refusedEl.textContent = _todayLogs.filter(l => l.result === 'refused').length;
+
+  // Pending panel
+  const pp = document.getElementById('pending-panel');
+  if (pending) {
+    pp.style.display = '';
+    document.getElementById('pending-name').textContent = pending.name;
+    document.getElementById('pending-phone').textContent = pending.phone;
+  } else {
+    pp.style.display = 'none';
+  }
+
+  // Call card
+  document.getElementById('no-contacts').style.display = total === 0 ? '' : 'none';
+  const cc = document.getElementById('call-card');
+  cc.style.display = total > 0 ? '' : 'none';
+
+  if (current) {
+    applyContactTheme(current); // 最終注文年齢で背景色切替
+    document.getElementById('current-name').textContent = current.name;
+    document.getElementById('call-card-settings').style.display = 'none';
+    document.getElementById('current-phone').textContent = current.phone;
+
+    // 電話番号2
+    const p2El = document.getElementById('current-phone2');
+    if (current.phone2) { p2El.textContent = '📞² ' + current.phone2; p2El.style.display = ''; }
+    else p2El.style.display = 'none';
+
+    // 住所（キャッシュ or 非同期取得）
+    const addrEl = document.getElementById('current-address');
+    if (current.address) {
+      addrEl.textContent = '📍 ' + current.address;
+    } else if (current.postalCode) {
+      addrEl.textContent = '📍 〒' + current.postalCode + '（取得中…）';
+      lookupAddress(idx);
+    } else {
+      addrEl.textContent = '';
+    }
+
+    // 顧客番号・最終オーダー日（HTML表示に変更 → 祝日色対応）
+    const ciEl = document.getElementById('current-customer-info');
+    const parts = [];
+    if (current.customerNo) parts.push(`🆔 ${escHtml(current.customerNo)}`);
+    if (current.lastOrderDate) parts.push(`🛒 最終: ${formatDateJPFull(current.lastOrderDate)}`);
+    if (parts.length) { ciEl.innerHTML = `<span style="font-size:13px">${parts.join('　　')}</span>`; ciEl.style.display = ''; }
+    else ciEl.style.display = 'none';
+
+    // バッジ1行表示（スコア・順位・間隔テキストは非表示）
+    const rankMap  = calcAllRanks();
+    const rank     = rankMap.get(String(current.id)) || 0;
+    const group    = getPriorityGroup(rank, contacts.length);
+    const tier     = getCustomerTier(current.id);
+    const anomaly  = detectAnomaly(current.id);
+    const hint     = getContactMethodHint(current.id);
+    let scoreHtml  = `<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">`;
+    scoreHtml += `<span style="font-size:12px;padding:2px 8px;border-radius:12px;font-weight:700;background:${tier.bg};color:${tier.color};border:1px solid ${tier.color}">${tier.emoji} ${tier.label}</span>`;
+    scoreHtml += `<span style="font-size:12px;padding:2px 8px;border-radius:12px;font-weight:700;background:${group.bg};color:${group.color};border:1px solid ${group.color}">${group.emoji} ${group.label}</span>`;
+    if (anomaly) scoreHtml += `<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(255,100,0,0.15);color:#ff6d00;border:1px solid #ff6d00">${anomaly.msg}</span>`;
+    if (tier.key === 'D') scoreHtml += `<span style="font-size:11px;color:#78909c;padding:2px 6px;border:1px dashed #78909c;border-radius:8px">${hint.icon} ${hint.method}推奨</span>`;
+    scoreHtml += `</div>`;
+    document.getElementById('current-score').innerHTML = scoreHtml;
+
+    // ② 次回ネタ表示
+    const ntEl = document.getElementById('current-nexttalk');
+    if (current.nextTalk) {
+      ntEl.textContent = '💬 次回：' + current.nextTalk;
+      ntEl.style.display = '';
+    } else {
+      ntEl.style.display = 'none';
+    }
+
+    // ⑥ 不在・留守電連続アラート
+    const recentAll = logs
+      .filter(l => String(l.contactId) === String(current.id) && l.result !== null)
+      .sort((a,b) => new Date(b.calledAt)-new Date(a.calledAt))
+      .slice(0, 4);
+    const absentEl = document.getElementById('current-absent-alert');
+    const absentCount = recentAll.findIndex(l => l.result !== 'no_answer' && l.result !== 'voicemail' && l.result !== 'skipped');
+    const consecutiveAbsent = absentCount === -1 ? recentAll.length : absentCount;
+    if (consecutiveAbsent >= 3) {
+      absentEl.innerHTML = `⚠️ ${consecutiveAbsent}回連続不在/留守 — 時間帯・曜日の変更を検討`;
+      absentEl.style.display = '';
+    } else {
+      absentEl.style.display = 'none';
+    }
+    document.getElementById('current-phone').textContent = current.phone;
+    document.getElementById('progress-text').textContent = `${idx + 1} / ${total}`;
+    document.getElementById('call-card-delete').onclick = () => removeContact(current.id);
+    const now = Date.now();
+    const overdueCount = contacts.filter(c => { const t = getNextDueTime(c.id); return t === 0 || t <= now; }).length;
+    const el = document.getElementById('overdue-count');
+    el.textContent = overdueCount > 0 ? `未連絡 ${overdueCount}件` : '';
+    // Back button
+    const backBtn = document.getElementById('back-btn');
+    if (backBtn) backBtn.disabled = navHistory.length === 0;
+    // Customer info fields
+    const info = current.info || {};
+    document.getElementById('info-likes').value    = info.likes    || '';
+    document.getElementById('info-delivery').value = info.delivery || '';
+    document.getElementById('info-payment').value  = info.payment  || '';
+    document.getElementById('info-notes').value    = info.notes    || '';
+
+    // 直近メモ
+    const recentMemoLog = logs.find(l => String(l.contactId) === String(current.id) && l.result !== null && l.memo);
+    const memoSection = document.getElementById('recent-memo-section');
+    if (recentMemoLog) {
+      memoSection.style.display = '';
+      document.getElementById('recent-memo-text').textContent = recentMemoLog.memo;
+      document.getElementById('recent-memo-date').textContent = formatDateFull(recentMemoLog.calledAt) + '　' + (RESULTS[recentMemoLog.result]?.emoji || '') + ' ' + (RESULTS[recentMemoLog.result]?.label || '');
+    } else {
+      memoSection.style.display = 'none';
+    }
+    let dueDate = getNextDueDate(current.id);
+    // フォールバック: getNextDueDate が null でも lastOrderDate があれば使う
+    if (!dueDate && current.lastOrderDate) {
+      const _fnd = normDateStr(current.lastOrderDate);
+      if (_fnd) {
+        const _fd = new Date(_fnd);
+        if (!isNaN(_fd.getTime())) {
+          _fd.setDate(_fd.getDate() + calculateSmartInterval(current.id));
+          if (!isNaN(_fd.getTime())) dueDate = _fd;
+        }
+      }
+    }
+    const daysEl = document.getElementById('current-days');
+    // グループ・スキップバッジ
+    const skipCnt  = getSkipCount(current.id);
+    const boosted  = current.groupBoostedAt &&
+      (Date.now() - new Date(current.groupBoostedAt).getTime()) < GROUP_BOOST_DAYS * 86400000;
+    let badges = '';
+    if (current.group) badges += `<span class="badge" style="background:#1e1040;color:#c084fc;border:1px solid #c084fc;margin-right:5px">🏷 ${escHtml(current.group)}</span>`;
+    if (skipCnt >= SKIP_THRESHOLD) badges += `<span class="badge" style="background:#2a1a00;color:var(--amber);border:1px solid var(--amber);margin-right:5px">⚠️ スキップ${skipCnt}回</span>`;
+    if (boosted) badges += `<span class="badge" style="background:#1a2a1a;color:#4ade80;border:1px solid #4ade80">🔔 グループ優先中</span>`;
+
+    // ④ 季節フラグバッジ
+    if (current.peakMonths?.length) {
+      const now2 = new Date();
+      const daysToNext = current.peakMonths.reduce((min, m) => {
+        let d = new Date(now2.getFullYear(), m - 1, 1);
+        if (d < now2) d = new Date(now2.getFullYear() + 1, m - 1, 1);
+        return Math.min(min, Math.ceil((d - now2) / 86400000));
+      }, 999);
+      if (daysToNext <= 60) {
+        badges += `<span class="badge" style="background:rgba(255,213,79,0.15);color:#ffd54f;border:1px solid #ffd54f">🌸 繁忙期${daysToNext}日前</span>`;
+      }
+    }
+
+    document.getElementById('current-badges').innerHTML = badges;
+    const intervalDays = getContactInterval(current.id);
+
+    // 未連絡月数
+    const monthInfo = getContactedMonths(current.id);
+    let monthLabel = '';
+    if (monthInfo === null) {
+      monthLabel = '';
+    } else if (monthInfo.months >= 1) {
+      monthLabel = ` <span style="color:var(--text2);font-size:13px">（${monthInfo.months}ヶ月${monthInfo.remDays > 0 ? monthInfo.remDays+'日' : ''}未連絡）</span>`;
+    } else {
+      monthLabel = ` <span style="color:var(--text2);font-size:13px">（${monthInfo.totalDays}日未連絡）</span>`;
+    }
+
+    const intervalLabel = `<span style="font-size:13px;color:var(--text3)">　間隔: ${intervalDays}日</span>`;
+    if (!dueDate || isNaN(dueDate.getTime())) {
+      daysEl.innerHTML = `<span class="badge" style="background:#1a1628;color:#c084fc;border:1px solid #c084fc;font-size:12px">📵 未連絡</span>${intervalLabel}`;
+    } else {
+      const daysUntil = Math.ceil((dueDate.getTime() - Date.now()) / 86400000);
+      if (daysUntil < 0) {
+        daysEl.innerHTML = `<span class="badge" style="background:#3a1111;color:#e84545;border:1px solid #e84545;font-size:12px">🔴 ${Math.abs(daysUntil)}日超過</span>${monthLabel}${intervalLabel}`;
+      } else if (daysUntil === 0) {
+        daysEl.innerHTML = `<span class="badge" style="background:var(--amber-dim);color:var(--amber);border:1px solid var(--amber);font-size:12px">🟡 今日が連絡日</span>${monthLabel}${intervalLabel}`;
+      } else if (daysUntil <= 7) {
+        daysEl.innerHTML = `<span class="badge" style="background:var(--amber-dim);color:var(--amber);border:1px solid var(--amber);font-size:12px">📅 ${formatDateJP(dueDate)}（${daysUntil}日後）</span>${monthLabel}${intervalLabel}`;
+      } else {
+        daysEl.innerHTML = `<span style="font-size:13px;color:var(--text2)">📅 次回: ${formatDateJP(dueDate)}（${daysUntil}日後）</span>${monthLabel}${intervalLabel}`;
+      }
+    }
+    document.getElementById('call-btn').disabled = !!pending;
+    const callBtn = document.getElementById('call-btn');
+    if (current && !pending) {
+      callBtn.href = 'tel:' + current.phone.replace(/[^\d+]/g, '');
+      callBtn.style.opacity = '';
+      callBtn.style.pointerEvents = '';
+      callBtn.style.animation = '';
+    } else {
+      callBtn.removeAttribute('href');
+      callBtn.style.opacity = '.35';
+      callBtn.style.pointerEvents = 'none';
+      callBtn.style.animation = 'none';
+    }
+
+    // 進捗バー（ドットは20件以下のみ、それ以上はバー表示）
+    const dotsEl = document.getElementById('progress-dots');
+    if (total <= 20) {
+      let html = '';
+      for (let i = 0; i < total; i++) {
+        const cls = i === idx ? 'current' : (i < idx ? 'done' : '');
+        html += `<div class="dot${cls ? ' ' + cls : ''}"></div>`;
+      }
+      dotsEl.innerHTML = html;
+      dotsEl.style.display = 'flex';
+    } else {
+      const pct = Math.round(((idx + 1) / total) * 100);
+      dotsEl.innerHTML = `<div style="flex:1;background:var(--surface2);border-radius:4px;height:6px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:var(--accent);border-radius:4px;transition:width .3s"></div>
+      </div>`;
+      dotsEl.style.display = 'flex';
+      dotsEl.style.alignItems = 'center';
+    }
+
+    // Past calls for this contact
+    const pastLogs = logs.filter(l => String(l.contactId) === String(current.id) && l.result !== null).slice(0, 4);
+    const pastPanel = document.getElementById('past-calls');
+    if (pastLogs.length) {
+      pastPanel.style.display = '';
+      document.getElementById('past-calls-list').innerHTML = pastLogs.map(l => {
+        const r = RESULTS[l.result];
+        return `<span style="margin-right:10px">${r.emoji} ${formatDate(l.calledAt)}</span>`;
+      }).join('');
+    } else {
+      pastPanel.style.display = 'none';
+    }
+  }
+
+  // Contacts list
+  document.getElementById('contacts-count').textContent = `${total} 件`;
+  const cl = document.getElementById('contacts-list');
+  const searchVal = (document.getElementById('contact-search')?.value || '').trim().toLowerCase();
+  const filtered = searchVal ? contacts.filter(c => {
+    const nameMatch  = c.name?.toLowerCase().includes(searchVal);
+    const phoneMatch = c.phone?.replace(/[^\d]/g,'').endsWith(searchVal.replace(/[^\d]/g,'')) && searchVal.replace(/[^\d]/g,'').length === 4;
+    const ccNum      = searchVal.replace(/[^\d]/g,'');
+    const ccMatch    = ccNum.length === 9 && c.customerNo?.includes(ccNum);
+    return nameMatch || phoneMatch || ccMatch;
+  }) : contacts;
+  if (filtered.length === 0) {
+    cl.innerHTML = `<div style="text-align:center;color:var(--text2);padding:30px 0;font-size:14px">${searchVal ? '該当する連絡先がありません' : '連絡先がありません'}</div>`;
+  } else {
+    const rankMap = calcAllRanks();
+  cl.innerHTML = filtered.map((c, i) => {
+      if (String(editingId) === String(c.id)) {
+        const curInterval = c.interval || DEFAULT_INTERVAL;
+        return `<div class="edit-form">
+          <input type="text" id="edit-name-${c.id}" value="${escHtml(c.name)}" placeholder="名前">
+          <input type="tel" id="edit-phone-${c.id}" value="${escHtml(c.phone)}" placeholder="電話番号">
+          <div style="display:flex;align-items:center;gap:8px">
+            <label style="font-size:12px;color:var(--text2);white-space:nowrap">連絡間隔</label>
+            <input type="number" id="edit-interval-${c.id}" value="${curInterval}" min="1" max="365" style="width:80px;text-align:center">
+            <span style="font-size:12px;color:var(--text2)">日（デフォルト: ${DEFAULT_INTERVAL}日）</span>
+          </div>
+          <input type="text" id="edit-group-${c.id}" value="${escHtml(c.group||'')}" placeholder="グループ名（任意）">
+          <div class="edit-btns">
+            <button class="btn-primary" onclick="saveEdit('${c.id}')">保存</button>
+            <button class="btn-ghost" onclick="cancelEdit()">キャンセル</button>
+          </div>
+        </div>`;
+      }
+      const isCurrent = contacts[idx] && c.id === contacts[idx].id;
+      const contactLogs = logs.filter(l => String(l.contactId) === String(c.id) && l.result !== null);
+      const lastLog = contactLogs[0];
+      const dueDate = getNextDueDate(c.id);
+      const intervalDays = getContactInterval(c.id);
+      let dueBadge;
+      if (!dueDate) {
+        dueBadge = '<span class="badge" style="background:#1a1628;color:#c084fc;border:1px solid #c084fc">未連絡</span>';
+      } else {
+        const daysUntil = Math.ceil((dueDate.getTime() - Date.now()) / 86400000);
+        if (daysUntil < 0) dueBadge = `<span class="badge" style="background:#3a1111;color:#e84545;border:1px solid #e84545">🔴 ${Math.abs(daysUntil)}日超過</span>`;
+        else if (daysUntil === 0) dueBadge = `<span class="badge" style="background:var(--amber-dim);color:var(--amber);border:1px solid var(--amber)">🟡 今日</span>`;
+        else if (daysUntil <= 7) dueBadge = `<span class="badge" style="background:var(--amber-dim);color:var(--amber);border:1px solid var(--amber)">${formatDateJP(dueDate)}</span>`;
+        else dueBadge = `<span style="font-size:11px;color:var(--text2)">📅 ${formatDateJP(dueDate)}</span>`;
+      }
+      return `<div class="contact-item" onclick="handleContactTap(event,'${c.id}')" style="cursor:pointer">
+        <div class="contact-num${isCurrent ? ' current' : ''}">${i+1}</div>
+        <div class="contact-info">
+          <div class="contact-name">${escHtml(c.name)}${isCurrent ? ' <span class="badge" style="background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);font-size:9px">次</span>' : ''}</div>
+          <div class="contact-phone">${escHtml(c.phone)}</div>
+          <div style="display:flex;gap:4px;align-items:center;margin-top:3px;flex-wrap:wrap">
+            ${dueBadge}
+            ${(() => { const r=rankMap.get(String(c.id))||0; const g=getPriorityGroup(r,contacts.length); return `<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:${g.bg};color:${g.color};border:1px solid ${g.color}">${g.emoji}${g.label}</span>`; })()}
+            ${(() => { const t=getCustomerTier(c.id); return `<span style="font-size:10px;padding:1px 5px;border-radius:8px;background:${t.bg};color:${t.color};border:1px solid ${t.color}">${t.emoji}${t.key}</span>`; })()}
+            <span style="font-size:10px;color:var(--text3)">${intervalDays}日</span>
+          </div>
+          <div style="display:flex;gap:4px;align-items:center;margin-top:2px;flex-wrap:wrap">
+            ${(() => { const a=detectAnomaly(c.id); return a ? `<span style="font-size:10px;color:#ff6d00">${a.msg}</span>` : ''; })()}
+            ${c.group ? `<span class="badge" style="background:#1e1040;color:#c084fc;border:1px solid #c084fc;font-size:9px">🏷 ${escHtml(c.group)}</span>` : ''}
+            ${getSkipCount(c.id) >= SKIP_THRESHOLD ? `<span class="badge" style="background:#2a1a00;color:var(--amber);border:1px solid var(--amber);font-size:9px">⚠️ スキップ${getSkipCount(c.id)}回</span>` : ''}
+            ${c.groupBoostedAt && (Date.now()-new Date(c.groupBoostedAt).getTime()) < GROUP_BOOST_DAYS*86400000 ? `<span class="badge" style="background:#1a2a1a;color:#4ade80;border:1px solid #4ade80;font-size:9px">🔔 G優先中</span>` : ''}
+            ${lastLog ? `<span style="font-size:10px;color:var(--text3)">${RESULTS[lastLog.result]?.emoji} ${formatDate(lastLog.calledAt)}</span>` : ''}
+          </div>
+        </div>
+        <button class="icon-btn" onclick="openOrderModal('${c.id}')" style="color:#a78bfa;font-size:15px">🛒</button>
+        <button class="icon-btn" onclick="startEdit('${c.id}')">✏️</button>
+        <button class="icon-btn" style="color:var(--danger)" onclick="removeContact('${c.id}')">🗑</button>
+      </div>`;
+    }).join('');
+  }
+
+  // Logs
+  document.getElementById('logs-count').textContent = `${logs.length} 件`;
+  const ll = document.getElementById('logs-list');
+  if (!logs.length) {
+    ll.innerHTML = '<div style="text-align:center;color:var(--text2);padding:30px 0;font-size:14px">通話履歴がありません</div>';
+  } else {
+    ll.innerHTML = logs.map(l => {
+      const r = l.result ? RESULTS[l.result] : null;
+      const badge = r
+        ? `<span class="badge" style="border:1px solid ${r.color};color:${r.color};background:transparent">${r.emoji} ${r.label}</span>`
+        : `<span class="badge" style="border:1px solid var(--amber);color:var(--amber);background:var(--amber-dim)">記録待ち</span>`;
+
+      if (editingLogId === l.id) {
+        return `<div class="log-item" style="border-color:var(--accent)">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+            <div><div class="log-name">${escHtml(l.name)}</div><div class="log-phone">${escHtml(l.phone)}</div></div>
+            ${badge}
+          </div>
+          <div class="log-date" style="margin-bottom:10px">${formatDateFull(l.calledAt)}</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:5px">📝 メモ</div>
+          <textarea id="log-edit-memo-${l.id}" rows="3" style="min-height:65px;margin-bottom:10px">${escHtml(l.memo || '')}</textarea>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:5px">📅 次回連絡日</div>
+          <input type="date" id="log-edit-date-${l.id}" value="${l.nextContactDate || ''}" style="font-family:var(--mono);margin-bottom:12px">
+          <div style="display:flex;gap:8px">
+            <button class="btn-primary" style="flex:1;padding:10px" onclick="saveLogEdit('${l.id}')">保存</button>
+            <button class="btn-ghost" style="flex:1;padding:10px" onclick="cancelLogEdit()">キャンセル</button>
+          </div>
+        </div>`;
+      }
+
+      const _cid = l.contactId ? `onclick="jumpToContact('${l.contactId}')" style="cursor:pointer"` : '';
+      return `<div class="log-item" ${_cid}>
+        <div class="log-top">
+          <div><div class="log-name" style="text-decoration:underline dotted">${escHtml(l.name)}</div><div class="log-phone">${escHtml(l.phone)}</div></div>
+          <div style="display:flex;align-items:center;gap:8px">
+            ${badge}
+            <button class="icon-btn" onclick="startLogEdit('${l.id}')" style="font-size:15px;opacity:.6">✏️</button>
+          </div>
+        </div>
+        <div class="log-date">${formatDateFull(l.calledAt)}</div>
+        ${l.memo ? `<div style="margin-top:7px;padding:7px 10px;background:var(--surface2);border-radius:7px;font-size:13px;color:var(--text2);border-left:2px solid var(--amber)">📝 ${escHtml(l.memo)}</div>` : ''}
+        ${l.nextContactDate ? `<div style="margin-top:5px;font-size:12px;color:var(--text2)">📅 次回: ${formatDateJP(new Date(l.nextContactDate))}（${l.nextContactDate}）</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  // History badge
+  const pendingCount = logs.filter(l => l.result === null).length;
+  const navHistoryBtn = document.getElementById('nav-history');
+  const existingBadge = navHistoryBtn.querySelector('.nav-badge');
+  if (existingBadge) existingBadge.remove();
+  if (pendingCount > 0) {
+    const b = document.createElement('span');
+    b.className = 'nav-badge';
+    b.textContent = pendingCount;
+    navHistoryBtn.appendChild(b);
+  }
+}
+
+// ===== Init =====
+checkAuth();
+load();
+migrateIds();
+ensureLastOrderDateLogged();
+syncSmartIntervals();
+applyYearTheme();
+// 起動時ダッシュボード（連絡先があれば自動表示）
+setTimeout(() => { if (contacts.length > 0) buildTodayList(); }, 300);
+updateDriveBar();
+// データ引継ぎ確認（初回ロード時にデータがあれば通知）
+(function() {
+  const shown = sessionStorage.getItem('autocall_loaded_notice');
+  if (!shown && (contacts.length > 0 || logs.length > 0)) {
+    sessionStorage.setItem('autocall_loaded_notice', '1');
+    // 認証後に表示するため少し待つ
+    setTimeout(() => {
+      const msg = document.getElementById('load-notice');
+      if (msg) { msg.style.display = 'flex'; setTimeout(() => msg.style.display = 'none', 3500); }
+    }, 800);
+  }
+})();
+render();
+
+// Handle visibility change (coming back from phone app)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') render();
+});
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(() => console.log('SW registered'))
+      .catch(e => console.log('SW error:', e));
+  });
+}
+</script>
+</body>
+</html>
