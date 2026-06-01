@@ -507,6 +507,7 @@
           <button class="btn-ghost" style="width:auto;padding:6px 10px;font-size:11px;color:#a78bfa;border-color:#a78bfa" id="btn-import-orders" onclick="importOrdersFromApp()">📦 注文取込</button>
           <button class="btn-ghost" style="width:auto;padding:7px 14px;font-size:12px" onclick="openImportModal()">📂 CSV</button>
           <button class="btn-ghost" style="width:auto;padding:7px 14px;font-size:12px" onclick="exportContacts()">💾 出力</button>
+          <button class="btn-ghost" style="width:auto;padding:6px 10px;font-size:11px;color:#ff7043;border-color:#ff7043" onclick="manualDedupe()">🔧 重複統合</button>
         </div>
       </div>
 
@@ -841,7 +842,7 @@ function executeOrderImport() {
       );
     }
     logs.unshift({
-      id:              'c_' + Date.now() + '_' + Math.floor(Math.random() * 9999),
+      id:              genId(),
       contactId:       contact.id,
       name:            contact.name,
       phone:           contact.phone,
@@ -878,7 +879,7 @@ function smartMergeContact(existing, nc) {
     );
     if (!alreadyLogged) {
       logs.unshift({
-        id:              'c_' + Date.now() + '_' + Math.floor(Math.random() * 9999),
+        id:              genId(),
         contactId:       existing.id,
         name:            existing.name,
         phone:           existing.phone,
@@ -964,7 +965,7 @@ function handleExcelImport(e) {
           lastOrder = String(rawDate).slice(0, 10);
         }
         excelImportData.push({
-          id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 9999),
+          id: genId(),
           name,
           phone: phone1,
           phone2: phone2 || null,
@@ -1295,7 +1296,7 @@ function saveOrderDates() {
 
   // ログエントリを作成
   const newLogs = newDates.map(d => ({
-    id:              'c_' + Date.now() + '_' + Math.floor(Math.random() * 9999),
+    id:              genId(),
     contactId:       c.id,
     name:            c.name,
     phone:           c.phone,
@@ -1330,6 +1331,103 @@ function saveOrderDates() {
 }
 
 // ===== IDマイグレーション（数値ID → 文字列IDに移行） =====
+// ===== 一意ID生成（カウンターで重複防止）=====
+let _idCounter = 0;
+function genId() {
+  return 'c_' + Date.now().toString(36) + '_' + (_idCounter++).toString(36) + '_' + Math.floor(Math.random() * 1e9).toString(36);
+}
+
+// 既存データの重複IDを検出して修正（ログも追従）
+// 手動で重複統合を実行
+function manualDedupe() {
+  const before = contacts.length;
+  fixDuplicateIds();
+  const after = contacts.length;
+  const removed = before - after;
+  render();
+  if (removed > 0) {
+    alert(`✅ ${removed}件の重複顧客を統合しました\n（${before}件 → ${after}件）\nログも正しい顧客に再リンクされました`);
+  } else {
+    alert('重複顧客は見つかりませんでした');
+  }
+}
+
+// 重複顧客をCC番号→名前+電話で統合し、ログを正しく紐付け直す
+function fixDuplicateIds() {
+  // ① まず全ログを「名前+電話」で正しい顧客に再リンク（contactId のズレを補正）
+  relinkLogsByIdentity();
+
+  // ② 重複顧客の統合（CC番号 優先、なければ名前+電話）
+  const groups = new Map();
+  contacts.forEach(c => {
+    const key = c.customerNo
+      ? 'cc:' + String(c.customerNo).trim()
+      : 'np:' + (c.name || '').trim() + '|' + (c.phone || '').trim();
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(c);
+  });
+
+  const merged = [];
+  const idRemap = new Map(); // 統合される旧ID → 残すID
+  let dupCount = 0;
+
+  groups.forEach(group => {
+    if (group.length === 1) { merged.push(group[0]); return; }
+    // 複数 → 1件に統合（最も情報量が多いものを残す）
+    const keep = group.reduce((best, c) => {
+      const score = (c.lastOrderDate ? 2 : 0) + (c.customerNo ? 1 : 0) + (c.info?.notes ? 1 : 0);
+      const bestScore = (best.lastOrderDate ? 2 : 0) + (best.customerNo ? 1 : 0) + (best.info?.notes ? 1 : 0);
+      return score > bestScore ? c : best;
+    }, group[0]);
+    group.forEach(dup => {
+      if (dup.id === keep.id) return;
+      idRemap.set(String(dup.id), keep.id);
+      // lastOrderDate は新しい方を保持
+      if (dup.lastOrderDate && (!keep.lastOrderDate || dup.lastOrderDate > keep.lastOrderDate)) {
+        keep.lastOrderDate = dup.lastOrderDate;
+      }
+      dupCount++;
+    });
+    merged.push(keep);
+  });
+
+  if (idRemap.size > 0) {
+    logs = logs.map(l => {
+      const newId = idRemap.get(String(l.contactId));
+      return newId ? { ...l, contactId: newId } : l;
+    });
+    contacts = merged;
+    _logsIndex = null;
+    save();
+    console.log(`重複顧客 ${dupCount}件を統合`);
+  }
+}
+
+// ログを「名前+電話」で現在の顧客に再リンク（ID破損の修復）
+function relinkLogsByIdentity() {
+  const nameMap = new Map(); // 名前|電話 → contactId
+  const ccMap   = new Map(); // CC番号 → contactId
+  contacts.forEach(c => {
+    const nk = (c.name || '').trim() + '|' + (c.phone || '').trim();
+    if (!nameMap.has(nk)) nameMap.set(nk, c.id);
+    if (c.customerNo) ccMap.set(String(c.customerNo).trim(), c.id);
+  });
+
+  let relinked = 0;
+  logs = logs.map(l => {
+    // 既存の contactId が有効な顧客を指していればそのまま
+    const exists = contacts.some(c => String(c.id) === String(l.contactId));
+    if (exists) return l;
+    // 名前+電話で再リンク
+    const nk = (l.name || '').trim() + '|' + (l.phone || '').trim();
+    const correctId = nameMap.get(nk);
+    if (correctId) { relinked++; return { ...l, contactId: correctId }; }
+    return l;
+  });
+  if (relinked > 0) { _logsIndex = null; }
+  return relinked;
+}
+
 function migrateIds() {
   const needsMigration = contacts.some(c => !String(c.id).startsWith('c_'));
   if (!needsMigration) return;
@@ -1338,7 +1436,7 @@ function migrateIds() {
   contacts = contacts.map((c, i) => {
     if (!String(c.id).startsWith('c_')) {
       const oldId = String(c.id);
-      const newId = 'c_' + Date.now() + '_' + i + '_' + Math.floor(Math.random() * 9999);
+      const newId = genId();
       idMap.set(oldId, newId);
       return { ...c, id: newId };
     }
@@ -1386,7 +1484,7 @@ function ensureLastOrderDateLogged() {
     );
     if (already) return;
     logs.push({
-      id:              'c_' + Date.now() + '_' + Math.floor(Math.random() * 9999),
+      id:              genId(),
       contactId:       c.id,
       name:            c.name,
       phone:           c.phone,
@@ -1761,7 +1859,7 @@ function logCall(e) {
   const idx = currentIdx % contacts.length;
   const contact = contacts[idx];
   const entry = {
-    id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 9999),
+    id: genId(),
     contactId: contact.id,
     name: contact.name,
     phone: contact.phone,
@@ -2355,7 +2453,7 @@ function addContact() {
   const name = document.getElementById('add-name').value.trim();
   const phone = document.getElementById('add-phone').value.trim();
   if (!name || !phone) { alert('名前と電話番号を入力してください'); return; }
-  contacts.push({ id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 9999), name, phone });
+  contacts.push({ id: genId(), name, phone });
   document.getElementById('add-name').value = '';
   document.getElementById('add-phone').value = '';
   save();
@@ -2620,7 +2718,7 @@ function setImportMode(mode) {
 }
 function executeImport() {
   if (!importData.length) return;
-  const newContacts = importData.map(d => ({ id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 9999), name: d.name, phone: d.phone }));
+  const newContacts = importData.map(d => ({ id: genId(), name: d.name, phone: d.phone }));
 
   if (importMode === 'replace') {
     if (!confirm(`既存の ${contacts.length} 件を削除して ${newContacts.length} 件をインポートします。よろしいですか？`)) return;
@@ -3021,7 +3119,7 @@ function render() {
           <div><div class="log-name" style="text-decoration:underline dotted">${escHtml(l.name)}</div><div class="log-phone">${escHtml(l.phone)}</div></div>
           <div style="display:flex;align-items:center;gap:8px">
             ${badge}
-            <button class="icon-btn" onclick="startLogEdit('${l.id}')" style="font-size:15px;opacity:.6">✏️</button>
+            <button class="icon-btn" onclick="event.stopPropagation();startLogEdit('${l.id}')" style="font-size:15px;opacity:.6">✏️</button>
           </div>
         </div>
         <div class="log-date">${formatDateFull(l.calledAt)}</div>
@@ -3048,6 +3146,7 @@ function render() {
 checkAuth();
 load();
 migrateIds();
+fixDuplicateIds();
 ensureLastOrderDateLogged();
 syncSmartIntervals();
 applyYearTheme();
