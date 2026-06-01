@@ -1,6 +1,4 @@
-const CACHE_NAME = 'mobileCRM-v32';
-
-// スコープ（サブディレクトリ対応）
+const CACHE_NAME = 'mobileCRM-v33';
 const BASE = self.registration.scope;
 const CACHE_FILES = [
   BASE,
@@ -10,9 +8,7 @@ const CACHE_FILES = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(CACHE_FILES))
-  );
+  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(CACHE_FILES)));
   self.skipWaiting();
 });
 
@@ -25,8 +21,17 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// ネットワーク優先（オンライン時は常に最新を取得、オフライン時のみキャッシュ）
 self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
+    fetch(e.request)
+      .then(res => {
+        // 成功したらキャッシュも更新
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then(c => c.put(e.request, copy)).catch(()=>{});
+        return res;
+      })
+      .catch(() => caches.match(e.request))
   );
 });

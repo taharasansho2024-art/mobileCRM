@@ -1365,7 +1365,7 @@ function fixDuplicateIds() {
     const samePhone = (c.phone || '').trim() === (first.phone || '').trim();
     if (sameName && samePhone) return; // 同一人物の重複は後段の統合で処理
     // 別人が同じID → この人のログを退避してから新ID発番
-    const oldId = c.id;
+    const oldId = String(c.id);
     const newId = genId();
     // この別人のログ（name+phone一致）を新IDへ
     logs.forEach(l => {
@@ -1432,19 +1432,18 @@ function fixDuplicateIds() {
 
 // ログを「名前+電話」で現在の顧客に再リンク（ID破損の修復）
 function relinkLogsByIdentity() {
-  const nameMap = new Map(); // 名前|電話 → contactId
-  const ccMap   = new Map(); // CC番号 → contactId
+  const nameMap = new Map();      // 名前|電話 → contactId
+  const validIds = new Set();     // 有効な contactId 集合（O(1)判定用）
   contacts.forEach(c => {
+    validIds.add(String(c.id));
     const nk = (c.name || '').trim() + '|' + (c.phone || '').trim();
     if (!nameMap.has(nk)) nameMap.set(nk, c.id);
-    if (c.customerNo) ccMap.set(String(c.customerNo).trim(), c.id);
   });
 
   let relinked = 0;
   logs = logs.map(l => {
-    // 既存の contactId が有効な顧客を指していればそのまま
-    const exists = contacts.some(c => String(c.id) === String(l.contactId));
-    if (exists) return l;
+    // 既存の contactId が有効な顧客を指していればそのまま（Setで高速判定）
+    if (validIds.has(String(l.contactId))) return l;
     // 名前+電話で再リンク
     const nk = (l.name || '').trim() + '|' + (l.phone || '').trim();
     const correctId = nameMap.get(nk);
