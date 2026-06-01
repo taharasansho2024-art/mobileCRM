@@ -1555,14 +1555,20 @@ function getOrderAgeIndex(contact) {
   }
 
   if (!lastOrder) return 5; // 未注文 = 休眠扱い
-  const orderYear = new Date(lastOrder).getFullYear();
-  const diff = new Date().getFullYear() - orderYear;
-  return Math.min(diff, 5);
+  // 日付正規化してから year を取得（不正な形式は休眠扱い）
+  const norm = normDateStr(lastOrder);
+  const d = norm ? new Date(norm) : new Date(lastOrder);
+  if (isNaN(d.getTime())) return 5;
+  const diff = new Date().getFullYear() - d.getFullYear();
+  // 0〜5 の範囲に必ずクランプ（NaN・負値・範囲外を防止）
+  if (isNaN(diff)) return 5;
+  return Math.max(0, Math.min(diff, 5));
 }
 
 function applyContactTheme(contact) {
-  const idx = getOrderAgeIndex(contact);
-  const theme = ORDER_AGE_THEMES[idx];
+  let idx = getOrderAgeIndex(contact);
+  if (isNaN(idx) || idx < 0 || idx >= ORDER_AGE_THEMES.length) idx = 5;
+  const theme = ORDER_AGE_THEMES[idx] || ORDER_AGE_THEMES[5];
   const cc = document.getElementById('call-card');
   if (cc) {
     cc.style.border    = '2px solid ' + theme.border;
