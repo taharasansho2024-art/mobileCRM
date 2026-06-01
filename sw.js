@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mobileCRM-v31';
+const CACHE_NAME = 'mobileCRM-v32';
 
 // スコープ（サブディレクトリ対応）
 const BASE = self.registration.scope;

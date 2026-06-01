@@ -1354,7 +1354,31 @@ function manualDedupe() {
 
 // 重複顧客をCC番号→名前+電話で統合し、ログを正しく紐付け直す
 function fixDuplicateIds() {
-  // ① まず全ログを「名前+電話」で正しい顧客に再リンク（contactId のズレを補正）
+  // ⓪ 違う人が同じIDを共有している場合、新IDを発番（最重要）
+  //    ログは name+phone で正しい顧客に追従させる
+  const idSeen = new Map(); // id → 最初の contact
+  contacts.forEach(c => {
+    const id = String(c.id);
+    if (!idSeen.has(id)) { idSeen.set(id, c); return; }
+    const first = idSeen.get(id);
+    const sameName  = (c.name || '').trim()  === (first.name || '').trim();
+    const samePhone = (c.phone || '').trim() === (first.phone || '').trim();
+    if (sameName && samePhone) return; // 同一人物の重複は後段の統合で処理
+    // 別人が同じID → この人のログを退避してから新ID発番
+    const oldId = c.id;
+    const newId = genId();
+    // この別人のログ（name+phone一致）を新IDへ
+    logs.forEach(l => {
+      if (String(l.contactId) === oldId &&
+          (l.name || '').trim()  === (c.name || '').trim() &&
+          (l.phone || '').trim() === (c.phone || '').trim()) {
+        l.contactId = newId;
+      }
+    });
+    c.id = newId;
+  });
+
+  // ① 全ログを「名前+電話」で正しい顧客に再リンク（contactId のズレを補正）
   relinkLogsByIdentity();
 
   // ② 重複顧客の統合（CC番号 優先、なければ名前+電話）
@@ -1397,10 +1421,13 @@ function fixDuplicateIds() {
       return newId ? { ...l, contactId: newId } : l;
     });
     contacts = merged;
-    _logsIndex = null;
-    save();
     console.log(`重複顧客 ${dupCount}件を統合`);
+  } else {
+    contacts = merged;
   }
+  // ID発番・再リンクが発生している可能性があるので常に保存
+  _logsIndex = null;
+  save();
 }
 
 // ログを「名前+電話」で現在の顧客に再リンク（ID破損の修復）
