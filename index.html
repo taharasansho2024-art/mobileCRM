@@ -1540,27 +1540,27 @@ const ORDER_AGE_THEMES = [
 ];
 
 function getOrderAgeIndex(contact) {
-  // ログからの最終注文日
+  // ログからの最終注文日（正規化してから比較）
   const logDates = logs
     .filter(l => String(l.contactId) === String(contact?.id) && l.result === 'ordered' && l.orderDate)
-    .map(l => l.orderDate).sort().reverse();
+    .map(l => normDateStr(l.orderDate)).filter(Boolean).sort().reverse();
   const logLastOrder = logDates[0] || null;
 
-  // contactのlastOrderDateとログの最新注文日の新しい方を使用
+  // contact.lastOrderDate も正規化
+  const contactLast = normDateStr(contact?.lastOrderDate);
+
+  // 両方とも正規化済みの YYYY-MM-DD なので文字列比較が正しく動く
   let lastOrder = null;
-  if (logLastOrder && contact?.lastOrderDate) {
-    lastOrder = logLastOrder > contact.lastOrderDate ? logLastOrder : contact.lastOrderDate;
+  if (logLastOrder && contactLast) {
+    lastOrder = logLastOrder > contactLast ? logLastOrder : contactLast;
   } else {
-    lastOrder = logLastOrder || contact?.lastOrderDate || null;
+    lastOrder = logLastOrder || contactLast || null;
   }
 
   if (!lastOrder) return 5; // 未注文 = 休眠扱い
-  // 日付正規化してから year を取得（不正な形式は休眠扱い）
-  const norm = normDateStr(lastOrder);
-  const d = norm ? new Date(norm) : new Date(lastOrder);
+  const d = new Date(lastOrder);
   if (isNaN(d.getTime())) return 5;
   const diff = new Date().getFullYear() - d.getFullYear();
-  // 0〜5 の範囲に必ずクランプ（NaN・負値・範囲外を防止）
   if (isNaN(diff)) return 5;
   return Math.max(0, Math.min(diff, 5));
 }
@@ -2335,9 +2335,9 @@ function getContactedLogs(contactId) {
   return all
     .filter(l => l.result === 'answered' || l.result === 'voicemail' || l.result === 'ordered' || l.result === 'refused')
     .sort((a, b) => {
-      // ordered ログは orderDate、それ以外は calledAt で比較
-      const da = (a.result === 'ordered' && a.orderDate) ? a.orderDate : (a.calledAt || '').split('T')[0];
-      const db = (b.result === 'ordered' && b.orderDate) ? b.orderDate : (b.calledAt || '').split('T')[0];
+      // ordered ログは orderDate、それ以外は calledAt で比較（正規化して比較）
+      const da = (a.result === 'ordered' && a.orderDate) ? (normDateStr(a.orderDate) || '') : (a.calledAt || '').split('T')[0];
+      const db = (b.result === 'ordered' && b.orderDate) ? (normDateStr(b.orderDate) || '') : (b.calledAt || '').split('T')[0];
       return db.localeCompare(da); // 降順（新しい順）
     });
 }
@@ -2372,12 +2372,16 @@ function getNextDueDate(contactId) {
   const c  = contacts.find(c => String(c.id) === String(contactId));
 
   // ログの最新接触日
-  // ordered ログは orderDate を優先（通話日≠注文日のケース対応）
-  const logDate  = cl.length > 0
-    ? ((cl[0].result === 'ordered' && cl[0].orderDate)
-        ? cl[0].orderDate + 'T00:00:00.000Z'
-        : cl[0].calledAt)
-    : null;
+  // ordered ログは orderDate を優先（通話日≠注文日のケース対応・正規化）
+  let logDate = null;
+  if (cl.length > 0) {
+    if (cl[0].result === 'ordered' && cl[0].orderDate) {
+      const _od = normDateStr(cl[0].orderDate);
+      logDate = _od ? _od + 'T00:00:00.000Z' : cl[0].calledAt;
+    } else {
+      logDate = cl[0].calledAt;
+    }
+  }
   // 顧客システムの最終注文日（ISO文字列に揃える）
   const _nd = normDateStr(c?.lastOrderDate);
   const sysDate  = _nd ? _nd + 'T00:00:00.000Z' : null;
