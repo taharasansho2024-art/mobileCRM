@@ -462,7 +462,10 @@
         <div id="past-calls" style="margin-bottom:8px;display:none">
           <div id="past-calls-list" style="font-size:11px;color:var(--text3)"></div>
         </div>
-        <a class="call-btn" id="call-btn" onclick="logCall(event)" style="padding:16px;font-size:19px">📞　コール</a>
+        <div style="display:flex;gap:8px;align-items:stretch">
+          <a class="call-btn" id="call-btn" onclick="logCall(event)" style="padding:16px;font-size:19px;flex:5">📞　コール</a>
+          <button class="call-btn" id="reinput-btn" onclick="reInput()" style="flex:1;padding:16px 4px;font-size:13px;background:linear-gradient(135deg,#6a3093,#a044ff);box-shadow:0 6px 24px rgba(160,68,255,.35)">入力</button>
+        </div>
         <div class="two-btn-row">
           <button class="btn-ghost" style="padding:9px" onclick="skipCurrent()">⏭ スキップして次へ</button>
           <button class="back-btn" id="back-btn" onclick="goBack()" disabled>← 戻る</button>
@@ -480,7 +483,7 @@
         </div>
         <div id="recent-memo-section" style="display:none;margin-top:8px">
           <div style="font-size:10px;color:var(--text2);font-weight:700;letter-spacing:.08em;margin-bottom:4px">💬 直近のメモ</div>
-          <div id="recent-memo-text" style="font-size:12px;color:var(--text2);background:var(--surface2);border-radius:7px;padding:7px 10px;border-left:2px solid var(--amber);line-height:1.5"></div>
+          <div id="recent-memo-text" style="max-height:220px;overflow-y:auto;font-size:12px;color:var(--text2);line-height:1.5"></div>
           <div id="recent-memo-date" style="font-size:10px;color:var(--text3);margin-top:3px"></div>
         </div>
       </div>
@@ -1918,6 +1921,37 @@ function logCall(e) {
   // href is already set on the <a> tag via render() — browser handles tel: call
 }
 
+// 電話をかけずに結果入力だけ開く（再入力用）
+function reInput() {
+  if (!contacts.length || pendingLogId) return;
+  flushInfoFields();
+  const idx = currentIdx % contacts.length;
+  const contact = contacts[idx];
+  const entry = {
+    id: genId(),
+    contactId: contact.id,
+    name: contact.name,
+    phone: contact.phone,
+    calledAt: new Date().toISOString(),
+    result: null
+  };
+  logs.unshift(entry);
+  pendingLogId = entry.id;
+  save();
+  render();
+  const m = document.getElementById('call-memo');
+  if (m) m.value = '';
+  const od = document.getElementById('order-date');
+  if (od) od.value = '';
+  const nd = document.getElementById('next-contact-date');
+  if (nd) {
+    const interval = calculateSmartInterval(contact.id);
+    const nextDate = new Date();
+    nextDate.setDate(nextDate.getDate() + interval);
+    nd.value = nextDate.toISOString().split('T')[0];
+  }
+}
+
 function recordResult(result) {
   if (!pendingLogId) return;
   const memo = (document.getElementById('call-memo')?.value || '').trim();
@@ -2924,13 +2958,26 @@ function render() {
     document.getElementById('info-payment').value  = info.payment  || '';
     document.getElementById('info-notes').value    = info.notes    || '';
 
-    // 直近メモ
-    const recentMemoLog = logs.find(l => String(l.contactId) === String(current.id) && l.result !== null && l.memo);
+    // 直近メモ（最大30件スクロール表示）
+    const memoLogs = (getLogsIndex().get(String(current.id)) || [])
+      .filter(l => l.result !== null && l.memo)
+      .sort((a, b) => new Date(b.calledAt) - new Date(a.calledAt))
+      .slice(0, 30);
     const memoSection = document.getElementById('recent-memo-section');
-    if (recentMemoLog) {
+    if (memoLogs.length > 0) {
       memoSection.style.display = '';
-      document.getElementById('recent-memo-text').textContent = recentMemoLog.memo;
-      document.getElementById('recent-memo-date').textContent = formatDateFull(recentMemoLog.calledAt) + '　' + (RESULTS[recentMemoLog.result]?.emoji || '') + ' ' + (RESULTS[recentMemoLog.result]?.label || '');
+      document.getElementById('recent-memo-text').innerHTML = memoLogs.map((l, i) => {
+        const dateStr = formatDateFull(l.calledAt);
+        const emoji   = RESULTS[l.result]?.emoji || '';
+        const label   = RESULTS[l.result]?.label || '';
+        const amount  = l.orderAmount > 0 ? `　💰¥${l.orderAmount.toLocaleString()}` : '';
+        const border  = i === 0 ? '2px solid var(--amber)' : '1px solid var(--border)';
+        return `<div style="padding:6px 8px;margin-bottom:5px;background:var(--surface2);border-radius:6px;border-left:${border}">
+          <div style="font-size:12px;color:var(--text)">${escHtml(l.memo)}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px">${dateStr}　${emoji}${label}${amount}</div>
+        </div>`;
+      }).join('');
+      document.getElementById('recent-memo-date').textContent = memoLogs.length >= 30 ? '（直近30件を表示）' : `（${memoLogs.length}件）`;
     } else {
       memoSection.style.display = 'none';
     }
