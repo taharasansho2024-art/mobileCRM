@@ -300,6 +300,18 @@
     <input type="password" id="drive-key-input" placeholder="スクリプトプロパティに設定したKEY" style="margin-bottom:16px">
     <button class="btn-primary" onclick="saveDriveSettings()">保存して接続確認</button>
     <div id="drive-settings-msg" style="font-size:12px;text-align:center;margin-top:10px;min-height:18px"></div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+    <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">⚙️ 表示設定</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:6px">超過日数の表示上限</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+      <input type="number" id="max-overdue-input" placeholder="100" min="0"
+        style="width:100px;text-align:center" oninput="saveMaxOverdue()">
+      <span style="font-size:12px;color:var(--text2)">日を超えたら非表示</span>
+    </div>
+    <div style="font-size:11px;color:var(--text3);line-height:1.5">
+      例：100 と入力すると、超過100日を超えた顧客はコール画面・スキップ・今日のリストに表示されなくなります。<br>空欄＝制限なし（全員表示）
+    </div>
     <div style="margin-top:16px;padding:12px;background:var(--surface2);border-radius:8px;font-size:11px;color:var(--text2);line-height:1.7">
       <b>設定手順</b><br>
       1. script.google.com で新規プロジェクト作成<br>
@@ -1069,8 +1081,10 @@ function buildTodayList() {
   const now    = Date.now();
   const rankMap = calcAllRanks();
 
-  // 全連絡先をスコアでソート
-  const scored = contacts.map(c => {
+  // 全連絡先をスコアでソート（超過上限を超えた人は除外）
+  const scored = contacts
+    .filter(c => !isOverMaxOverdue(c.id))
+    .map(c => {
     const rank    = rankMap.get(String(c.id)) || 999;
     const score   = calculatePriorityScore(c.id);
     const dueDate = getNextDueDate(c.id);
@@ -1806,6 +1820,8 @@ function openDriveSettings() {
   document.getElementById('drive-url-input').value = url;
   document.getElementById('drive-key-input').value = key;
   document.getElementById('drive-settings-msg').textContent = '';
+  const maxOv = getMaxOverdue();
+  document.getElementById('max-overdue-input').value = maxOv === null ? '' : maxOv;
   document.getElementById('drive-modal').style.display = 'flex';
 }
 function closeDriveModal(e) {
@@ -1839,6 +1855,31 @@ const MIN_INTERVAL     = 14;
 const MAX_INTERVAL     = 90;
 const SKIP_THRESHOLD   = 3;
 const GROUP_BOOST_DAYS = 7;
+const MAX_OVERDUE_KEY  = 'autocall_max_overdue';
+
+// 超過日数の表示上限（null=制限なし）
+function getMaxOverdue() {
+  const v = parseInt(localStorage.getItem(MAX_OVERDUE_KEY));
+  return isNaN(v) ? null : v;
+}
+function saveMaxOverdue() {
+  const v = document.getElementById('max-overdue-input')?.value;
+  if (v === '' || v == null) localStorage.removeItem(MAX_OVERDUE_KEY);
+  else localStorage.setItem(MAX_OVERDUE_KEY, String(parseInt(v)));
+  _ranksCache = null;
+  render();
+}
+
+// この顧客が超過上限を超えているか（表示対象外か）
+function isOverMaxOverdue(contactId) {
+  const maxOv = getMaxOverdue();
+  if (maxOv === null) return false; // 制限なし
+  const dueDate = getNextDueDate(contactId);
+  if (!dueDate || isNaN(dueDate.getTime())) return false; // 未連絡は対象外にしない
+  const overdueDays = Math.floor((Date.now() - dueDate.getTime()) / 86400000);
+  return overdueDays > maxOv;
+}
+
 let contacts = [];
 let logs = [];
 let currentIdx = 0;
@@ -2079,20 +2120,32 @@ function flushInfoFields() {
 function getRandomSkipIdx() {
   if (contacts.length <= 1) return 0;
   const now = Date.now();
-  // 実際の期日（スコア前倒しなし）で超過・未連絡を判定
-  const priority = contacts
+  // 実際の期日で超過・未連絡を判定。超過上限を超えた人は除外
+  const candidates = contacts
     .map((c, i) => {
       const dueDate = getNextDueDate(c.id);
       const dueTime = (!dueDate || isNaN(dueDate.getTime())) ? 0 : dueDate.getTime();
-      return { i, dueTime };
+      const score   = calculatePriorityScore(c.id);
+      return { i, id: c.id, dueTime, score };
     })
-    .filter(x => x.i !== currentIdx && (x.dueTime === 0 || x.dueTime <= now));
-  if (priority.length > 0) {
-    return priority[Math.floor(Math.random() * priority.length)].i;
+    .filter(x => x.i !== currentIdx
+      && (x.dueTime === 0 || x.dueTime <= now)   // 超過 or 未連絡
+      && !isOverMaxOverdue(x.id));                // 超過上限を超えていない
+
+  if (candidates.length > 0) {
+    // 優先順位の高い（スコアの高い）順に上位を絞り、その中からランダム
+    candidates.sort((a, b) => b.score - a.score);
+    const topN = candidates.slice(0, Math.max(3, Math.ceil(candidates.length * 0.3)));
+    return topN[Math.floor(Math.random() * topN.length)].i;
   }
-  // 全員期限内の場合: 現在以外からランダム
-  const others = contacts.map((_, i) => i).filter(i => i !== currentIdx);
-  return others[Math.floor(Math.random() * others.length)];
+  // 期限内の人しかいない場合: 超過上限を超えていない人からランダム
+  const others = contacts
+    .map((_, i) => i)
+    .filter(i => i !== currentIdx && !isOverMaxOverdue(contacts[i].id));
+  if (others.length > 0) return others[Math.floor(Math.random() * others.length)];
+  // 全員上限超え → 現在以外からランダム（フォールバック）
+  const all = contacts.map((_, i) => i).filter(i => i !== currentIdx);
+  return all[Math.floor(Math.random() * all.length)];
 }
 
 // ===== Priority logic =====

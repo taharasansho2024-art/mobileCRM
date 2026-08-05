@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mobileCRM-v39';
+const CACHE_NAME = 'mobileCRM-v40';
 const BASE = self.registration.scope;
 const CACHE_FILES = [
   BASE,
