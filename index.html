@@ -401,9 +401,10 @@
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:8px">
           <button class="result-btn" style="border-color:#3dd9a4;color:#3dd9a4" onclick="recordResult('answered')">✅ 通話できた</button>
           <button class="result-btn" style="border-color:#a78bfa;color:#a78bfa" onclick="recordResult('ordered')">🛒 注文有り</button>
-          <button class="result-btn" style="border-color:#f5a623;color:#f5a623" onclick="recordResult('voicemail')">📼 留守電</button>
-          <button class="result-btn" style="border-color:#e84545;color:#e84545" onclick="recordResult('no_answer')">❌ 不在</button>
-          <button class="result-btn" style="border-color:#ff7043;color:#ff7043;grid-column:1/-1" onclick="recordResult('refused')">🚫 お断り</button>
+          <button class="result-btn" style="border-color:#f5a623;color:#f5a623" onclick="recordResult('voicemail')">📼 留守電入れた</button>
+          <button class="result-btn" style="border-color:#e84545;color:#e84545" onclick="recordResult('no_answer')">❌ 不在or出ない</button>
+          <button class="result-btn" style="border-color:#ff7043;color:#ff7043" onclick="recordResult('refused')">🚫 お断り</button>
+          <button class="result-btn" style="border-color:#42a5f5;color:#42a5f5" onclick="recordResult('considering')">🤔 検討</button>
         </div>
         <button class="result-btn" style="border-color:#8892aa;color:#8892aa;width:100%;font-size:12px;padding:9px" onclick="recordResult('skipped')">⏭ スキップ</button>
       </div>
@@ -515,11 +516,24 @@
       </div>
 
       <!-- 検索ボックス -->
-      <div style="position:relative;margin-bottom:10px">
+      <div style="position:relative;margin-bottom:8px">
         <input type="search" id="contact-search" placeholder="🔍 名前・電話末尾4桁・顧客番号9桁" oninput="render()"
           style="padding-right:36px;padding-top:13px;padding-bottom:13px;font-size:16px">
         <button onclick="document.getElementById('contact-search').value='';render()"
           style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;padding:0">×</button>
+      </div>
+
+      <!-- 超過日数フィルター -->
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--text2)">超過日数</span>
+        <input type="number" id="overdue-min" placeholder="下限" min="0" oninput="render()"
+          style="width:70px;padding:6px 8px;font-size:13px;text-align:center">
+        <span style="font-size:12px;color:var(--text3)">〜</span>
+        <input type="number" id="overdue-max" placeholder="上限" min="0" oninput="render()"
+          style="width:70px;padding:6px 8px;font-size:13px;text-align:center">
+        <span style="font-size:11px;color:var(--text3)">日</span>
+        <button onclick="document.getElementById('overdue-min').value='';document.getElementById('overdue-max').value='';render()"
+          style="background:none;border:1px solid var(--border);color:var(--text3);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-family:inherit">クリア</button>
       </div>
 
       <div id="contacts-list"></div>
@@ -1836,12 +1850,13 @@ let editingId = null;
 let navHistory = [];
 
 const RESULTS = {
-  answered:  { label: '通話できた', emoji: '✅', color: '#3dd9a4' },
-  voicemail: { label: '留守電',     emoji: '📼', color: '#f5a623' },
-  no_answer: { label: '不在',       emoji: '❌', color: '#e84545' },
-  ordered:   { label: '注文有り',   emoji: '🛒', color: '#a78bfa' },
-  refused:   { label: 'お断り',     emoji: '🚫', color: '#ff7043' },
-  skipped:   { label: 'スキップ',   emoji: '⏭', color: '#8892aa' },
+  answered:   { label: '通話できた',   emoji: '✅', color: '#3dd9a4' },
+  ordered:    { label: '注文有り',     emoji: '🛒', color: '#a78bfa' },
+  voicemail:  { label: '留守電入れた', emoji: '📼', color: '#f5a623' },
+  no_answer:  { label: '不在or出ない', emoji: '❌', color: '#e84545' },
+  refused:    { label: 'お断り',       emoji: '🚫', color: '#ff7043' },
+  considering:{ label: '検討',         emoji: '🤔', color: '#42a5f5' },
+  skipped:    { label: 'スキップ',     emoji: '⏭', color: '#8892aa' },
 };
 
 // ===== Storage =====
@@ -1976,6 +1991,10 @@ function recordResult(result) {
     } else if (result === 'no_answer') {
       // 不在はコール済みだが応答なし → 次回期日をリセットしない
       nextContactDate = null;
+    } else if (result === 'considering') {
+      // 検討中 → 短めの間隔で再アプローチ（7〜14日）
+      const followUp = Math.min(14, Math.max(7, Math.round(smartInt * 0.5)));
+      d.setDate(d.getDate() + followUp);
     } else {
       d.setDate(d.getDate() + smartInt);
     }
@@ -2367,7 +2386,7 @@ function getPriorityGroup(rank, total) {
 function getContactedLogs(contactId) {
   const all = getLogsIndex().get(String(contactId)) || [];
   return all
-    .filter(l => l.result === 'answered' || l.result === 'voicemail' || l.result === 'ordered' || l.result === 'refused')
+    .filter(l => l.result === 'answered' || l.result === 'voicemail' || l.result === 'ordered' || l.result === 'refused' || l.result === 'considering')
     .sort((a, b) => {
       // ordered ログは orderDate、それ以外は calledAt で比較（正規化して比較）
       const da = (a.result === 'ordered' && a.orderDate) ? (normDateStr(a.orderDate) || '') : (a.calledAt || '').split('T')[0];
@@ -3093,18 +3112,46 @@ function render() {
   }
 
   // Contacts list
-  document.getElementById('contacts-count').textContent = `${total} 件`;
   const cl = document.getElementById('contacts-list');
   const searchVal = (document.getElementById('contact-search')?.value || '').trim().toLowerCase();
-  const filtered = searchVal ? contacts.filter(c => {
+  const overdueMin = parseInt(document.getElementById('overdue-min')?.value);
+  const overdueMax = parseInt(document.getElementById('overdue-max')?.value);
+  const hasOverdueFilter = !isNaN(overdueMin) || !isNaN(overdueMax);
+
+  let filtered = searchVal ? contacts.filter(c => {
     const nameMatch  = c.name?.toLowerCase().includes(searchVal);
     const phoneMatch = c.phone?.replace(/[^\d]/g,'').endsWith(searchVal.replace(/[^\d]/g,'')) && searchVal.replace(/[^\d]/g,'').length === 4;
     const ccNum      = searchVal.replace(/[^\d]/g,'');
     const ccMatch    = ccNum.length === 9 && c.customerNo?.includes(ccNum);
     return nameMatch || phoneMatch || ccMatch;
   }) : contacts;
+
+  // 超過日数フィルター（今日 - 次回予定日 = 超過日数）
+  if (hasOverdueFilter) {
+    const now = Date.now();
+    filtered = filtered.filter(c => {
+      const dueDate = getNextDueDate(c.id);
+      if (!dueDate || isNaN(dueDate.getTime())) return false; // 未連絡は対象外
+      const overdueDays = Math.floor((now - dueDate.getTime()) / 86400000);
+      if (!isNaN(overdueMin) && overdueDays < overdueMin) return false;
+      if (!isNaN(overdueMax) && overdueDays > overdueMax) return false;
+      return true;
+    });
+    // 超過日数の多い順にソート
+    filtered = filtered.sort((a, b) => {
+      const da = getNextDueDate(a.id), db = getNextDueDate(b.id);
+      const oa = da ? (now - da.getTime()) : 0;
+      const ob = db ? (now - db.getTime()) : 0;
+      return ob - oa;
+    });
+  }
+
+  // 件数表示（フィルター時は絞り込み後の件数）
+  document.getElementById('contacts-count').textContent =
+    (searchVal || hasOverdueFilter) ? `${filtered.length} / ${total} 件` : `${total} 件`;
+
   if (filtered.length === 0) {
-    cl.innerHTML = `<div style="text-align:center;color:var(--text2);padding:30px 0;font-size:14px">${searchVal ? '該当する連絡先がありません' : '連絡先がありません'}</div>`;
+    cl.innerHTML = `<div style="text-align:center;color:var(--text2);padding:30px 0;font-size:14px">${searchVal || hasOverdueFilter ? '該当する連絡先がありません' : '連絡先がありません'}</div>`;
   } else {
     const rankMap = calcAllRanks();
   cl.innerHTML = filtered.map((c, i) => {
